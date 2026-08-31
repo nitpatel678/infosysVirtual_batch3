@@ -1,6 +1,18 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import google.generativeai as genai
+
+load_dotenv()
+
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise RuntimeError("GEMINI_API_KEY not set in .env")
+
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-3.6-flash")
 
 app = FastAPI(title="AI Response Validation System")
 
@@ -27,5 +39,8 @@ def chat(request: ChatRequest):
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    # Gemini API call will be added in next checkpoint
-    return {"response": f"Received: {question}"}
+    try:
+        result = model.generate_content(question)
+        return {"response": result.text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
