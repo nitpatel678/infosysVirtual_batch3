@@ -12,5 +12,5 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Not part of project
+# project_google_meet_notes
 dont_touch/
