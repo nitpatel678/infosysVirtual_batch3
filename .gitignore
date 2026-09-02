@@ -14,3 +14,6 @@ Thumbs.db
 
 # project_google_meet_notes
 dont_touch/
+
+# Knowledge base data (generated locally)
+backend/knowledge_base/data/
