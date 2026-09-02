@@ -206,6 +206,23 @@ function App() {
                 )}
               </div>
 
+              {evalResult.retrieved_evidence && evalResult.retrieved_evidence.length > 0 && (
+                <div className="result-section">
+                  <h3>Retrieved Knowledge Base Evidence (RAG)</h3>
+                  <div className="evidence-list">
+                    {evalResult.retrieved_evidence.map((item, idx) => (
+                      <div key={idx} className="evidence-item">
+                        <div className="evidence-header">
+                          <span className="evidence-source">{item.source}</span>
+                          <span className="evidence-score">Score: {(item.score * 100).toFixed(1)}%</span>
+                        </div>
+                        <p className="evidence-text">{item.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="result-section">
                 <h3>Scores</h3>
                 <div className="scores-grid">

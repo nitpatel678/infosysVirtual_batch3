@@ -1,4 +1,7 @@
 import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
 from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -36,6 +39,11 @@ class EvaluateRequest(BaseModel):
     source_material: Optional[str] = None
 
 
+class RetrieveRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 3
+
+
 @app.get("/")
 def root():
     return {"status": "running"}
@@ -54,6 +62,21 @@ def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
 
 
+@app.post("/api/retrieve")
+def api_retrieve(request: RetrieveRequest):
+    query = request.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+
+    top_k = max(1, min(request.top_k or 3, 10))
+    try:
+        from knowledge_base.retrieval import retrieve
+        results = retrieve(query, top_k=top_k)
+        return {"query": query, "top_k": top_k, "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Retrieval error: {str(e)}")
+
+
 @app.post("/api/evaluate")
 def evaluate(request: EvaluateRequest):
     question = request.question.strip()
@@ -67,8 +90,16 @@ def evaluate(request: EvaluateRequest):
     reference_answer = (request.reference_answer or "").strip() or None
     source_material = (request.source_material or "").strip() or None
 
+    # Retrieve relevant supporting evidence from knowledge base (RAG)
+    retrieved_evidence = []
+    try:
+        from knowledge_base.retrieval import retrieve
+        retrieved_evidence = retrieve(question, top_k=3)
+    except Exception as e:
+        print(f"Warning: RAG retrieval failed: {e}")
+
     # Evaluation agents will be connected in future milestones.
-    # For now, return the processed input with placeholder scores.
+    # For now, return the processed input with retrieved evidence and placeholder scores.
     return {
         "input": {
             "question": question,
@@ -76,6 +107,7 @@ def evaluate(request: EvaluateRequest):
             "reference_answer": reference_answer,
             "source_material": source_material,
         },
+        "retrieved_evidence": retrieved_evidence,
         "scores": {
             "relevance": None,
             "accuracy": None,
@@ -83,6 +115,6 @@ def evaluate(request: EvaluateRequest):
             "completeness": None,
         },
         "verdict": None,
-        "message": "Evaluation input received. Agents not yet connected.",
+        "message": "Evaluation input received. Retrieved evidence attached. Evaluation agents not yet connected.",
     }
 

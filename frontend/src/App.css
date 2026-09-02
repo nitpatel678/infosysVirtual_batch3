@@ -241,6 +241,52 @@
   margin-top: 12px;
 }
 
+/* Retrieved Evidence */
+.evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.evidence-item {
+  background: #f8faff;
+  border: 1px solid #dbe4ff;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.evidence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.evidence-source {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #3b5de7;
+  background: #eef2ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.evidence-score {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2b8a3e;
+}
+
+.evidence-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #333;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 /* Error */
 .error-message {
   color: #e74c3c;
