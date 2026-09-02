@@ -3,11 +3,15 @@ Embedding generation and FAISS index building.
 Loads preprocessed chunks, generates embeddings using Sentence Transformers,
 and builds a FAISS index for semantic search.
 """
-import json
 import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
+import json
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
+
 
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")

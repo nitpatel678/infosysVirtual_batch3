@@ -3,8 +3,11 @@ Dataset ingestion and preprocessing for the Reference Knowledge Base.
 Downloads TruthfulQA and SQuAD from Hugging Face, cleans and standardizes
 the data into a unified chunk format for embedding and retrieval.
 """
-import json
 import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
+import json
 from datasets import load_dataset
 
 
@@ -36,10 +39,13 @@ def download_truthfulqa():
     return chunks
 
 
-def download_squad():
+def download_squad(max_samples=1000):
     """Download SQuAD dataset and extract context-based QA pairs."""
-    print("Downloading SQuAD...")
-    ds = load_dataset("rajpurkar/squad", split="validation")
+    print(f"Downloading SQuAD (first {max_samples} samples)...")
+    ds = load_dataset("squad", split="validation")
+    if max_samples:
+        ds = ds.select(range(min(max_samples, len(ds))))
+
 
     chunks = []
     seen_contexts = set()

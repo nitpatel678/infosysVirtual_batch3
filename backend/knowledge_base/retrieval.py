@@ -3,11 +3,15 @@ Semantic retrieval from the FAISS knowledge base.
 Loads the pre-built index and metadata, then retrieves
 relevant chunks for a given query.
 """
-import json
 import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
+import json
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
+
 
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")

@@ -4,8 +4,13 @@ Run this script once to set up the knowledge base.
 
 Usage: python build_knowledge_base.py
 """
+import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
 from knowledge_base.ingest import ingest
 from knowledge_base.embeddings import build
+
 
 
 def main():
