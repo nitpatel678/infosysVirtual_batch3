@@ -1,7 +1,3 @@
-"""
-Validation script for semantic retrieval against TruthfulQA and SQuAD benchmark data.
-Tests representative queries to verify vector search and scoring quality.
-"""
 from knowledge_base.retrieval import retrieve
 
 test_queries = [

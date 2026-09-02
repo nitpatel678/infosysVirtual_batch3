@@ -1,8 +1,3 @@
-"""
-Embedding generation and FAISS index building.
-Loads preprocessed chunks, generates embeddings using Sentence Transformers,
-and builds a FAISS index for semantic search.
-"""
 import os
 os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"

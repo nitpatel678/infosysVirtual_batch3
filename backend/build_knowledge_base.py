@@ -1,9 +1,3 @@
-"""
-Build the complete knowledge base: ingest datasets, generate embeddings, build FAISS index.
-Run this script once to set up the knowledge base.
-
-Usage: python build_knowledge_base.py
-"""
 import os
 os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"

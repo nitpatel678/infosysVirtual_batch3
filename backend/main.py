@@ -98,8 +98,6 @@ def evaluate(request: EvaluateRequest):
     except Exception as e:
         print(f"Warning: RAG retrieval failed: {e}")
 
-    # Evaluation agents will be connected in future milestones.
-    # For now, return the processed input with retrieved evidence and placeholder scores.
     return {
         "input": {
             "question": question,

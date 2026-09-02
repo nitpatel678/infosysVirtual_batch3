@@ -1,8 +1,3 @@
-"""
-Semantic retrieval from the FAISS knowledge base.
-Loads the pre-built index and metadata, then retrieves
-relevant chunks for a given query.
-"""
 import os
 os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"
