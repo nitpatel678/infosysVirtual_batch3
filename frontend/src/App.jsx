@@ -1,250 +1,51 @@
-import { useState } from 'react'
+import React from 'react'
+import Navbar from './components/Navbar'
+import StatsOverview from './components/StatsOverview'
+import EvaluationModule from './components/EvaluationModule'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('ask')
-
-  // Ask AI state
-  const [question, setQuestion] = useState('')
-  const [response, setResponse] = useState('')
-  const [chatLoading, setChatLoading] = useState(false)
-  const [chatError, setChatError] = useState('')
-
-  // Evaluate state
-  const [evalQuestion, setEvalQuestion] = useState('')
-  const [evalAiResponse, setEvalAiResponse] = useState('')
-  const [evalReference, setEvalReference] = useState('')
-  const [evalSource, setEvalSource] = useState('')
-  const [evalResult, setEvalResult] = useState(null)
-  const [evalLoading, setEvalLoading] = useState(false)
-  const [evalError, setEvalError] = useState('')
-
-  async function handleAskSubmit(e) {
-    e.preventDefault()
-    const trimmed = question.trim()
-    if (!trimmed) return
-
-    setChatLoading(true)
-    setChatError('')
-    setResponse('')
-
-    try {
-      const res = await fetch('http://localhost:8000/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: trimmed }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setChatError(data.detail || 'Something went wrong')
-      } else {
-        setResponse(data.response)
-      }
-    } catch (err) {
-      setChatError('Could not connect to the server')
-    } finally {
-      setChatLoading(false)
-    }
-  }
-
-  async function handleEvalSubmit(e) {
-    e.preventDefault()
-    const q = evalQuestion.trim()
-    const ai = evalAiResponse.trim()
-    if (!q || !ai) return
-
-    setEvalLoading(true)
-    setEvalError('')
-    setEvalResult(null)
-
-    try {
-      const res = await fetch('http://localhost:8000/api/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: q,
-          ai_response: ai,
-          reference_answer: evalReference.trim() || null,
-          source_material: evalSource.trim() || null,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setEvalError(data.detail || 'Something went wrong')
-      } else {
-        setEvalResult(data)
-      }
-    } catch (err) {
-      setEvalError('Could not connect to the server')
-    } finally {
-      setEvalLoading(false)
-    }
-  }
-
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>AI Response Validation System</h1>
-        <p>Ask AI questions or evaluate AI-generated responses</p>
-      </header>
+    <div className="app-layout">
+      <Navbar />
 
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'ask' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ask')}
-        >
-          Ask AI
-        </button>
-        <button
-          className={`tab ${activeTab === 'evaluate' ? 'active' : ''}`}
-          onClick={() => setActiveTab('evaluate')}
-        >
-          Evaluate Response
-        </button>
-      </div>
+      <main className="main-content">
+        <section className="hero-section">
+          <div className="hero-badge">MILESTONE 1 • RAG GROUNDING ENGINE</div>
+          <h1 className="hero-heading">
+            AI Response Validation <span className="hero-heading-dim">& Hallucination Detection</span>
+          </h1>
+          <p className="hero-subheading">
+            Autonomous multi-stage response extraction and grounding powered by Google Gemini,
+            Sentence Transformers, and FAISS vector similarity over TruthfulQA and SQuAD benchmarks.
+          </p>
+        </section>
 
-      {activeTab === 'ask' && (
-        <div className="tab-content">
-          <form className="chat-form" onSubmit={handleAskSubmit}>
-            <input
-              type="text"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Enter your question..."
-              disabled={chatLoading}
-            />
-            <button type="submit" disabled={chatLoading || !question.trim()}>
-              {chatLoading ? 'Asking...' : 'Ask AI'}
-            </button>
-          </form>
+        <StatsOverview />
 
-          {chatError && <p className="error-message">{chatError}</p>}
+        <EvaluationModule />
+      </main>
 
-          <div className="response-box">
-            <h2>AI Response</h2>
-            {chatLoading ? (
-              <p className="loading">Generating response...</p>
-            ) : response ? (
-              <div className="content">{response}</div>
-            ) : (
-              <p className="placeholder">Response will appear here</p>
-            )}
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-left">
+            <div className="footer-title">Infosys Springboard Virtual Internship</div>
+            <div className="footer-details">
+              Project Code: <strong>#M-3-5</strong> • Intern: <strong>Nitin Patel</strong> • Batch: <strong>3</strong> • Mentor: <strong>Devender Pratap</strong>
+            </div>
+          </div>
+          <div className="footer-right">
+            <a
+              href="https://github.com/nitpatel678/infosysVirtual_batch3.git"
+              target="_blank"
+              rel="noreferrer"
+              className="footer-link"
+            >
+              GitHub Repository
+            </a>
           </div>
         </div>
-      )}
-
-      {activeTab === 'evaluate' && (
-        <div className="tab-content">
-          <form className="eval-form" onSubmit={handleEvalSubmit}>
-            <div className="form-group">
-              <label>Question *</label>
-              <input
-                type="text"
-                value={evalQuestion}
-                onChange={(e) => setEvalQuestion(e.target.value)}
-                placeholder="Enter the question that was asked..."
-                disabled={evalLoading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>AI Response *</label>
-              <textarea
-                value={evalAiResponse}
-                onChange={(e) => setEvalAiResponse(e.target.value)}
-                placeholder="Paste the AI-generated response to evaluate..."
-                rows={4}
-                disabled={evalLoading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Reference Answer (optional)</label>
-              <textarea
-                value={evalReference}
-                onChange={(e) => setEvalReference(e.target.value)}
-                placeholder="Provide a known correct answer for comparison..."
-                rows={3}
-                disabled={evalLoading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Source Material (optional)</label>
-              <textarea
-                value={evalSource}
-                onChange={(e) => setEvalSource(e.target.value)}
-                placeholder="Provide source documents or reference material..."
-                rows={3}
-                disabled={evalLoading}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="eval-submit"
-              disabled={evalLoading || !evalQuestion.trim() || !evalAiResponse.trim()}
-            >
-              {evalLoading ? 'Evaluating...' : 'Submit for Evaluation'}
-            </button>
-          </form>
-
-          {evalError && <p className="error-message">{evalError}</p>}
-
-          {evalResult && (
-            <div className="eval-result">
-              <h2>Evaluation Result</h2>
-              <div className="result-section">
-                <h3>Input Received</h3>
-                <p><strong>Question:</strong> {evalResult.input.question}</p>
-                <p><strong>AI Response:</strong> {evalResult.input.ai_response}</p>
-                {evalResult.input.reference_answer && (
-                  <p><strong>Reference:</strong> {evalResult.input.reference_answer}</p>
-                )}
-                {evalResult.input.source_material && (
-                  <p><strong>Source:</strong> {evalResult.input.source_material}</p>
-                )}
-              </div>
-
-              {evalResult.retrieved_evidence && evalResult.retrieved_evidence.length > 0 && (
-                <div className="result-section">
-                  <h3>Retrieved Knowledge Base Evidence (RAG)</h3>
-                  <div className="evidence-list">
-                    {evalResult.retrieved_evidence.map((item, idx) => (
-                      <div key={idx} className="evidence-item">
-                        <div className="evidence-header">
-                          <span className="evidence-source">{item.source}</span>
-                          <span className="evidence-score">Score: {(item.score * 100).toFixed(1)}%</span>
-                        </div>
-                        <p className="evidence-text">{item.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="result-section">
-                <h3>Scores</h3>
-                <div className="scores-grid">
-                  {Object.entries(evalResult.scores).map(([key, value]) => (
-                    <div key={key} className="score-item">
-                      <span className="score-label">{key}</span>
-                      <span className="score-value">{value ?? 'Pending'}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="result-section">
-                <h3>Verdict</h3>
-                <p>{evalResult.verdict ?? 'Evaluation agents not yet connected'}</p>
-              </div>
-
-              <p className="result-note">{evalResult.message}</p>
-            </div>
-          )}
-        </div>
-      )}
+      </footer>
     </div>
   )
 }
