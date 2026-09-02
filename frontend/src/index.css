@@ -42,7 +42,6 @@ body {
   line-height: 1.6;
 }
 
-/* Custom Sleek Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

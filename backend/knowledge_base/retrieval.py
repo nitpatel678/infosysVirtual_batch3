@@ -7,8 +7,6 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 
-
-
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 MODEL_NAME = "all-MiniLM-L6-v2"
 
@@ -18,7 +16,6 @@ _metadata = None
 
 
 def _load():
-    """Lazy-load the model, index, and metadata."""
     global _model, _index, _metadata
 
     if _model is None:
@@ -37,7 +34,6 @@ def _load():
 
 
 def retrieve(query, top_k=5):
-    """Retrieve the top-k most relevant chunks for a query."""
     _load()
 
     query_embedding = _model.encode([query])

@@ -1,5 +1,4 @@
 import React from 'react'
-import { motion } from 'framer-motion'
 import { CheckCircle2, Loader2, Sparkles, Search, FileText } from 'lucide-react'
 
 export default function PipelineTracker({ currentStep, activeStepMessage }) {
@@ -30,13 +29,19 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
     },
   ]
 
+  const isComplete = currentStep >= 4
+
   return (
     <div className="pipeline-card">
       <div className="pipeline-header">
         <div className="pipeline-title">RAG EXECUTION PIPELINE</div>
         {activeStepMessage && (
           <div className="pipeline-live-badge">
-            <Loader2 size={12} className="spin-icon" />
+            {isComplete ? (
+              <CheckCircle2 size={13} className="text-white" />
+            ) : (
+              <Loader2 size={13} className="spin-icon" />
+            )}
             <span>{activeStepMessage}</span>
           </div>
         )}
@@ -44,10 +49,9 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
 
       <div className="pipeline-steps">
         {steps.map((step) => {
-          const isDone = currentStep > step.id
-          const isActive = currentStep === step.id
-          const isPending = currentStep < step.id
-          const Icon = step.icon
+          const isDone = isComplete ? true : currentStep > step.id
+          const isActive = !isComplete && currentStep === step.id
+          const isPending = !isComplete && currentStep < step.id
 
           return (
             <div

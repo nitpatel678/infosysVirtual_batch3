@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
+import uvicorn
 
 load_dotenv()
 
@@ -90,7 +91,6 @@ def evaluate(request: EvaluateRequest):
     reference_answer = (request.reference_answer or "").strip() or None
     source_material = (request.source_material or "").strip() or None
 
-    # Retrieve relevant supporting evidence from knowledge base (RAG)
     retrieved_evidence = []
     try:
         from knowledge_base.retrieval import retrieve
@@ -116,3 +116,6 @@ def evaluate(request: EvaluateRequest):
         "message": "Evaluation input received. Retrieved evidence attached. Evaluation agents not yet connected.",
     }
 
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

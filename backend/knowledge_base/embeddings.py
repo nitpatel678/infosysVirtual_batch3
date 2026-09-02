@@ -7,21 +7,17 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 
-
-
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 def load_chunks():
-    """Load preprocessed chunks from JSON."""
     chunks_path = os.path.join(DATA_DIR, "chunks.json")
     with open(chunks_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def generate_embeddings(chunks):
-    """Generate embeddings for all chunk texts."""
     print(f"Loading embedding model: {MODEL_NAME}")
     model = SentenceTransformer(MODEL_NAME)
 
@@ -33,7 +29,6 @@ def generate_embeddings(chunks):
 
 
 def build_faiss_index(embeddings):
-    """Build a FAISS index from embeddings."""
     dimension = embeddings.shape[1]
     print(f"Building FAISS index (dimension={dimension}, vectors={embeddings.shape[0]})")
 
@@ -45,7 +40,6 @@ def build_faiss_index(embeddings):
 
 
 def save_index(index, chunks):
-    """Save the FAISS index and chunk metadata."""
     os.makedirs(DATA_DIR, exist_ok=True)
 
     index_path = os.path.join(DATA_DIR, "faiss.index")
@@ -69,7 +63,6 @@ def save_index(index, chunks):
 
 
 def build():
-    """Main pipeline: load chunks → embed → index → save."""
     chunks = load_chunks()
     print(f"Loaded {len(chunks)} chunks")
 

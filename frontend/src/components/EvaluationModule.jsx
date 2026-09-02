@@ -5,36 +5,64 @@ import {
   ArrowRight,
   Bot,
   Database,
-  Layers,
   FileEdit,
   RotateCcw,
   CheckCircle,
-  Clock,
   AlertCircle,
-  HelpCircle,
 } from 'lucide-react'
 import EvidenceCard from './EvidenceCard'
 import PipelineTracker from './PipelineTracker'
+
+function formatInline(text) {
+  if (!text) return null
+  const parts = text.split(/(\*\*.*?\*\*)/g)
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+      return <strong key={idx}>{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
+}
+
+function renderFormattedText(text) {
+  if (!text) return null
+  const lines = text.split('\n')
+  return lines.map((line, idx) => {
+    const trimmed = line.trim()
+    if (!trimmed) {
+      return <div key={idx} className="formatted-spacer" />
+    }
+    if (trimmed.startsWith('### ')) {
+      return <h4 key={idx} className="formatted-h4">{formatInline(trimmed.slice(4))}</h4>
+    }
+    if (trimmed.startsWith('## ')) {
+      return <h3 key={idx} className="formatted-h3">{formatInline(trimmed.slice(3))}</h3>
+    }
+    if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+      return (
+        <div key={idx} className="formatted-bullet">
+          <span className="bullet-dot">•</span>
+          <span>{formatInline(trimmed.slice(2))}</span>
+        </div>
+      )
+    }
+    return <p key={idx} className="formatted-p">{formatInline(line)}</p>
+  })
+}
 
 export default function EvaluationModule() {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
   const [referenceAnswer, setReferenceAnswer] = useState('')
-  const [sourceMaterial, setSourceMaterial] = useState('')
 
-  // Generation Mode: 'auto' (automatically fetch from Gemini) vs 'manual' (paste custom)
   const [mode, setMode] = useState('auto')
-
-  // Execution state
-  const [pipelineStep, setPipelineStep] = useState(0) // 0 = idle, 1 = dispatch, 2 = gemini, 3 = faiss, 4 = complete
+  const [pipelineStep, setPipelineStep] = useState(0)
   const [stepMessage, setStepMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Result state
   const [results, setResults] = useState(null)
 
-  // Example presets from TruthfulQA / SQuAD
   const samplePresets = [
     {
       q: 'What happens if you smash a mirror?',
@@ -71,12 +99,10 @@ export default function EvaluationModule() {
     let finalAiResponse = aiResponse.trim()
 
     try {
-      // STEP 1: Payload Preparation
       setPipelineStep(1)
-      setStepMessage('Preparing payload and initializing request...')
-      await new Promise((r) => setTimeout(r, 400))
+      setStepMessage('Preparing request payload...')
+      await new Promise((r) => setTimeout(r, 300))
 
-      // STEP 2: Automatically generate response from Gemini API if in auto mode or empty
       if (mode === 'auto' || !finalAiResponse) {
         setPipelineStep(2)
         setStepMessage('Requesting response from Gemini 3.6 Flash API...')
@@ -95,10 +121,9 @@ export default function EvaluationModule() {
         const chatData = await chatRes.json()
         finalAiResponse = chatData.response
         setAiResponse(finalAiResponse)
-        await new Promise((r) => setTimeout(r, 400))
+        await new Promise((r) => setTimeout(r, 300))
       }
 
-      // STEP 3: RAG Semantic Vector Search against FAISS Knowledge Base
       setPipelineStep(3)
       setStepMessage('Querying FAISS vector index (TruthfulQA + SQuAD)...')
 
@@ -109,7 +134,6 @@ export default function EvaluationModule() {
           question: trimmedQ,
           ai_response: finalAiResponse,
           reference_answer: referenceAnswer.trim() || null,
-          source_material: sourceMaterial.trim() || null,
         }),
       })
 
@@ -120,7 +144,6 @@ export default function EvaluationModule() {
 
       const evalData = await evalRes.json()
 
-      // STEP 4: Complete & display
       setPipelineStep(4)
       setStepMessage('Knowledge grounding successfully extracted.')
       setResults(evalData)
@@ -136,7 +159,6 @@ export default function EvaluationModule() {
     setQuestion('')
     setAiResponse('')
     setReferenceAnswer('')
-    setSourceMaterial('')
     setResults(null)
     setPipelineStep(0)
     setError('')
@@ -144,7 +166,6 @@ export default function EvaluationModule() {
 
   return (
     <div className="module-container">
-      {/* Workflow Tabs / Mode Switcher */}
       <div className="pipeline-controls">
         <div className="mode-toggle-group">
           <button
@@ -173,7 +194,6 @@ export default function EvaluationModule() {
         )}
       </div>
 
-      {/* Input Form */}
       <form onSubmit={handleRunPipeline} className="pipeline-form">
         <div className="input-group">
           <div className="input-header">
@@ -181,7 +201,7 @@ export default function EvaluationModule() {
               User Question / Query <span className="req-star">*</span>
             </label>
             <div className="presets-list">
-              <span className="presets-label">Benchmark Presets:</span>
+              <span className="presets-label">Presets:</span>
               {samplePresets.map((p, i) => (
                 <button
                   key={i}
@@ -204,7 +224,6 @@ export default function EvaluationModule() {
           />
         </div>
 
-        {/* AI Response Field (Auto-generated or Manually entered) */}
         {mode === 'manual' ? (
           <div className="input-group">
             <label className="input-label">
@@ -223,44 +242,25 @@ export default function EvaluationModule() {
           <div className="auto-info-banner">
             <Sparkles size={16} className="text-white" />
             <div className="auto-info-text">
-              <strong>Automated Mode Active:</strong> Submitting will instantly call{' '}
-              <code>Google Gemini API</code> to generate the response, then process and extract grounding
-              evidence from <code>TruthfulQA</code> and <code>SQuAD</code>.
+              <strong>Automated Mode Active:</strong> Submitting will query the Gemini API for a response,
+              then extract grounding evidence from the TruthfulQA and SQuAD knowledge base.
             </div>
           </div>
         )}
 
-        {/* Optional Context Fields */}
-        <div className="optional-fields-row">
-          <div className="input-group flex-1">
-            <label className="input-label flex-between">
-              <span>Reference Ground Truth (Optional)</span>
-              <span className="optional-tag">Optional</span>
-            </label>
-            <input
-              type="text"
-              className="text-input text-input-sm"
-              value={referenceAnswer}
-              onChange={(e) => setReferenceAnswer(e.target.value)}
-              placeholder="Known correct answer for comparison..."
-              disabled={loading}
-            />
-          </div>
-
-          <div className="input-group flex-1">
-            <label className="input-label flex-between">
-              <span>Source Document (Optional)</span>
-              <span className="optional-tag">Optional</span>
-            </label>
-            <input
-              type="text"
-              className="text-input text-input-sm"
-              value={sourceMaterial}
-              onChange={(e) => setSourceMaterial(e.target.value)}
-              placeholder="External source material or passage..."
-              disabled={loading}
-            />
-          </div>
+        <div className="input-group">
+          <label className="input-label flex-between">
+            <span>Reference Ground Truth (Optional)</span>
+            <span className="optional-tag">Optional</span>
+          </label>
+          <input
+            type="text"
+            className="text-input text-input-sm"
+            value={referenceAnswer}
+            onChange={(e) => setReferenceAnswer(e.target.value)}
+            placeholder="Known correct answer for comparison (optional)..."
+            disabled={loading}
+          />
         </div>
 
         {error && (
@@ -291,18 +291,16 @@ export default function EvaluationModule() {
         </div>
       </form>
 
-      {/* Live Progress Pipeline Tracker */}
       {pipelineStep > 0 && (
         <PipelineTracker currentStep={pipelineStep} activeStepMessage={stepMessage} />
       )}
 
-      {/* Results View */}
       <AnimatePresence>
         {results && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.3 }}
             className="results-container"
           >
             <div className="results-header">
@@ -314,7 +312,6 @@ export default function EvaluationModule() {
             </div>
 
             <div className="results-grid">
-              {/* Left Column: AI Response */}
               <div className="result-column">
                 <div className="column-card">
                   <div className="card-header">
@@ -326,7 +323,7 @@ export default function EvaluationModule() {
                   </div>
 
                   <div className="ai-response-content">
-                    {results.input.ai_response}
+                    {renderFormattedText(results.input.ai_response)}
                   </div>
 
                   {results.input.reference_answer && (
@@ -335,30 +332,9 @@ export default function EvaluationModule() {
                       <p className="sub-block-text">{results.input.reference_answer}</p>
                     </div>
                   )}
-
-                  {results.input.source_material && (
-                    <div className="card-sub-block">
-                      <span className="sub-block-label">User Source Material:</span>
-                      <p className="sub-block-text">{results.input.source_material}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Evaluation Status Notice */}
-                <div className="column-card notice-card">
-                  <div className="notice-header">
-                    <Clock size={16} />
-                    <h4>Milestone 2 Evaluation Notice</h4>
-                  </div>
-                  <p className="notice-text">
-                    As specified for Milestone 1, automated response generation and RAG semantic evidence
-                    extraction are active. Multi-agent evaluation scoring (Relevance, Accuracy, Hallucination,
-                    Completeness) and final verdict will execute in Milestone 2.
-                  </p>
                 </div>
               </div>
 
-              {/* Right Column: RAG Grounding Evidence */}
               <div className="result-column">
                 <div className="column-card">
                   <div className="card-header">
@@ -371,10 +347,6 @@ export default function EvaluationModule() {
                     </span>
                   </div>
 
-                  <p className="evidence-summary-note">
-                    Semantic vector search performed over 2,766 chunks in the local FAISS index.
-                  </p>
-
                   <div className="evidence-cards-list">
                     {results.retrieved_evidence && results.retrieved_evidence.length > 0 ? (
                       results.retrieved_evidence.map((evidence, idx) => (
@@ -382,7 +354,7 @@ export default function EvaluationModule() {
                       ))
                     ) : (
                       <div className="empty-evidence">
-                        <p>No high-confidence evidence chunks found for this specific query.</p>
+                        <p>No matching evidence chunks found for this query in TruthfulQA / SQuAD.</p>
                       </div>
                     )}
                   </div>

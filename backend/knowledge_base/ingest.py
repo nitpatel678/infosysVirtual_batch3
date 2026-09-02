@@ -1,8 +1,3 @@
-"""
-Dataset ingestion and preprocessing for the Reference Knowledge Base.
-Downloads TruthfulQA and SQuAD from Hugging Face, cleans and standardizes
-the data into a unified chunk format for embedding and retrieval.
-"""
 import os
 os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"
@@ -10,19 +5,16 @@ os.environ["USE_TORCH"] = "1"
 import json
 from datasets import load_dataset
 
-
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 
 def download_truthfulqa():
-    """Download TruthfulQA dataset and extract QA pairs."""
     print("Downloading TruthfulQA...")
     ds = load_dataset("truthfulqa/truthful_qa", "multiple_choice", split="validation")
     
     chunks = []
     for i, row in enumerate(ds):
         question = row["question"].strip()
-
         best_answer = row["mc1_targets"]["choices"][0] if row["mc1_targets"]["choices"] else ""
 
         chunk_text = f"Question: {question}\nAnswer: {best_answer}"
@@ -40,12 +32,10 @@ def download_truthfulqa():
 
 
 def download_squad(max_samples=1000):
-    """Download SQuAD dataset and extract context-based QA pairs."""
     print(f"Downloading SQuAD (first {max_samples} samples)...")
     ds = load_dataset("squad", split="validation")
     if max_samples:
         ds = ds.select(range(min(max_samples, len(ds))))
-
 
     chunks = []
     seen_contexts = set()
@@ -55,7 +45,6 @@ def download_squad(max_samples=1000):
         question = row["question"].strip()
         answer = row["answers"]["text"][0].strip() if row["answers"]["text"] else ""
 
-        # Create a chunk for the context (deduplicated)
         ctx_key = context[:200]
         if ctx_key not in seen_contexts:
             seen_contexts.add(ctx_key)
@@ -83,7 +72,6 @@ def download_squad(max_samples=1000):
 
 
 def chunk_long_text(text, max_length=500):
-    """Split long text into smaller chunks by sentences."""
     if len(text) <= max_length:
         return [text]
 
@@ -106,7 +94,6 @@ def chunk_long_text(text, max_length=500):
 
 
 def preprocess_chunks(raw_chunks):
-    """Clean, standardize, and split long chunks."""
     processed = []
 
     for chunk in raw_chunks:
@@ -132,7 +119,6 @@ def preprocess_chunks(raw_chunks):
 
 
 def ingest():
-    """Main ingestion pipeline: download, clean, save."""
     os.makedirs(DATA_DIR, exist_ok=True)
 
     truthfulqa_chunks = download_truthfulqa()

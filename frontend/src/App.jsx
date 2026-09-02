@@ -1,6 +1,5 @@
 import React from 'react'
 import Navbar from './components/Navbar'
-import StatsOverview from './components/StatsOverview'
 import EvaluationModule from './components/EvaluationModule'
 import './App.css'
 
@@ -11,17 +10,15 @@ function App() {
 
       <main className="main-content">
         <section className="hero-section">
-          <div className="hero-badge">MILESTONE 1 • RAG GROUNDING ENGINE</div>
+          <div className="hero-badge">AI Hallucination Evaluator</div>
           <h1 className="hero-heading">
-            AI Response Validation <span className="hero-heading-dim">& Hallucination Detection</span>
+            AI Response Validation <span className="hero-heading-dim">& Grounding Engine</span>
           </h1>
           <p className="hero-subheading">
-            Autonomous multi-stage response extraction and grounding powered by Google Gemini,
-            Sentence Transformers, and FAISS vector similarity over TruthfulQA and SQuAD benchmarks.
+            Response extraction and knowledge grounding powered by Google Gemini,
+            Sentence Transformers, and FAISS vector retrieval over TruthfulQA and SQuAD benchmarks.
           </p>
         </section>
-
-        <StatsOverview />
 
         <EvaluationModule />
       </main>
