@@ -17,7 +17,7 @@ if not api_key:
     raise RuntimeError("GEMINI_API_KEY not set in .env")
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-3.6-flash")
+model = genai.GenerativeModel("gemini-3.5-flash")
 
 app = FastAPI(title="AI Response Validation System")
 
@@ -42,7 +42,7 @@ class EvaluateRequest(BaseModel):
 
 class RetrieveRequest(BaseModel):
     query: str
-    top_k: Optional[int] = 10
+    top_k: Optional[int] = 5
 
 
 @app.get("/")
@@ -57,7 +57,11 @@ def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     try:
-        result = model.generate_content(question)
+        try:
+            result = model.generate_content(question)
+        except Exception:
+            fallback = genai.GenerativeModel("gemini-1.5-flash")
+            result = fallback.generate_content(question)
         return {"response": result.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
