@@ -2,215 +2,136 @@
 
 ## Overview
 
-The AI Response Validation System evaluates AI-generated responses for quality, accuracy, and reliability. It uses multiple specialized evaluation agents orchestrated through a central pipeline, with a reference knowledge base providing supporting evidence.
+The AI Response Validation System evaluates AI-generated responses for quality, accuracy, and reliability. It uses specialized evaluation agents orchestrated through a central pipeline, with a reference knowledge base and persistent PostgreSQL database storage for grounded evidence and audit tracking.
 
 ## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React)                         │
+│                    Frontend (React + Vite)                  │
 │                                                             │
-│  ┌──────────────┐    ┌────────────────────────────────┐     │
-│  │  Ask AI Tab   │    │  Evaluate Response Tab          │     │
-│  │  (Question)   │    │  (Question + AI Response +      │     │
-│  │               │    │   Reference + Source Material)   │     │
-│  └──────┬───────┘    └───────────────┬────────────────┘     │
-│         │                            │                      │
-│         └────────────┬───────────────┘                      │
-│                      │                                      │
-│  ┌───────────────────▼──────────────────────────────────┐   │
-│  │           Results & Evaluation Dashboard              │   │
-│  │  (Scores, Evidence, Reasoning, Verdict)               │   │
-│  └───────────────────────────────────────────────────────┘   │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ HTTP API
-┌──────────────────────▼──────────────────────────────────────┐
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Evaluation Submission Module                         │  │
+│  │  (Question * + AI Response * + Ref Answer + PDF File) │  │
+│  └───────────────────────────┬───────────────────────────┘  │
+│                              │                              │
+│  ┌───────────────────────────▼───────────────────────────┐  │
+│  │  Multi-Stage Agent Progress & Verdict Banner          │  │
+│  │  (PASS / FAIL, Composite Score, Neon DB Record ID)    │  │
+│  └───────────────────────────┬───────────────────────────┘  │
+│                              │                              │
+│  ┌───────────────────────────▼───────────────────────────┐  │
+│  │  Evaluation History Dashboard (Top-Right Navbar)      │  │
+│  │  (Audit Log of Past Runs Fetched from Neon DB)        │  │
+│  └───────────────────────────────────────────────────────┘  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTP API / Multipart
+┌──────────────────────────────▼──────────────────────────────┐
 │                 Backend / API Layer (FastAPI)                │
 │                                                             │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ POST /chat   │  │POST /evaluate│  │  GET /health     │   │
-│  └──────┬──────┘  └──────┬───────┘  └──────────────────┘   │
-│         │                │                                  │
-│         ▼                ▼                                  │
-│  ┌─────────────┐  ┌──────────────────────────────────┐     │
-│  │  Gemini API  │  │  Evaluation Input Processing     │     │
-│  │  (Generate)  │  │  Module                          │     │
-│  └─────────────┘  └──────────────┬───────────────────┘     │
-│                                  │                          │
-│                   ┌──────────────▼──────────────────┐       │
-│                   │    RAG Retrieval Pipeline       │       │
-│                   │  (Query → Embed → Search →     │       │
-│                   │   Retrieve Evidence)            │       │
-│                   └──────────────┬──────────────────┘       │
-│                                  │                          │
-│                   ┌──────────────▼──────────────────┐       │
-│                   │    Agent Orchestrator           │       │
-│                   │  (Coordinates all judge agents) │       │
-│                   └──┬───┬───┬───┬───┬─────────────┘       │
-│                      │   │   │   │   │                      │
-│              ┌───────┘   │   │   │   └──────────┐           │
-│              ▼           ▼   ▼   ▼              ▼           │
-│        ┌──────────┐ ┌─────┐ ┌─────┐ ┌──────┐ ┌────────┐   │
-│        │Relevance │ │Accu-│ │Hall-│ │Compl-│ │Verdict │   │
-│        │  Judge   │ │racy │ │ucin-│ │eten- │ │ Agent  │   │
-│        │  Agent   │ │Judge│ │ation│ │ess   │ │        │   │
-│        │          │ │Agent│ │Det. │ │Judge │ │        │   │
-│        └──────────┘ └─────┘ └─────┘ └──────┘ └────────┘   │
-│                                                             │
-│                   ┌────────────────────────────────┐        │
-│                   │  Structured Evaluation Results │        │
-│                   │  (Scores + Evidence +          │        │
-│                   │   Reasoning + Verdict)         │        │
-│                   └────────────────────────────────┘        │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│              Reference Knowledge Base                       │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Benchmark Dataset Ingestion                         │   │
-│  │  (TruthfulQA + SQuAD from Hugging Face)              │   │
-│  └───────────────────────┬──────────────────────────────┘   │
+│  ┌────────────────┐  ┌───────────────┐  ┌────────────────┐  │
+│  │ POST /evaluate │  │  GET /history │  │ POST /retrieve │  │
+│  └───────┬────────┘  └───────┬───────┘  └────────────────┘  │
+│          │                   │                              │
+│          ▼                   ▼                              │
+│  ┌────────────────┐  ┌───────────────┐                      │
+│  │ PDF Parser     │  │  Neon DB      │                      │
+│  │ (pypdf Text)   │  │  (PostgreSQL) │                      │
+│  └───────┬────────┘  └───────────────┘                      │
+│          │                                                  │
+│          ▼                                                  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ RAG Retrieval Pipeline (Top-10 FAISS Search)          │  │
+│  │ (TruthfulQA + SQuAD Benchmark Knowledge Base)         │  │
+│  └───────────────────────────┬───────────────────────────┘  │
+│                              │                              │
+│          ┌───────────────────▼───────────────────┐          │
+│          │          Agent Orchestrator           │          │
+│          │        (Powered by Google Gemini)     │          │
+│          └─┬─────────────┬─────────────┬───────┬─┘          │
+│            │             │             │       │            │
+│            ▼             ▼             ▼       ▼            │
+│     ┌────────────┐ ┌───────────┐ ┌──────────┐ ┌──────────┐  │
+│     │ Relevance  │ │ Accuracy  │ │ Hallucin-│ │ Complete │  │
+│     │   Judge    │ │   Judge   │ │  ation   │ │  Judge   │  │
+│     │   Agent    │ │   Agent   │ │Detection │ │  Agent   │  │
+│     └──────┬─────┘ └─────┬─────┘ └────┬─────┘ └────┬─────┘  │
+│            └─────────────┼────────────┴────────────┘        │
 │                          ▼                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Data Cleaning & Chunking Pipeline                   │   │
-│  │  (Clean → Standardize → Chunk)                       │   │
-│  └───────────────────────┬──────────────────────────────┘   │
+│                 ┌──────────────────┐                        │
+│                 │  Verdict Agent   │                        │
+│                 │  (PASS / FAIL)   │                        │
+│                 └────────┬─────────┘                        │
+│                          │                                  │
 │                          ▼                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Embedding Generation (Sentence Transformers)        │   │
-│  └───────────────────────┬──────────────────────────────┘   │
-│                          ▼                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Vector Database (FAISS)                             │   │
-│  │  (Indexed chunks with metadata)                      │   │
-│  └──────────────────────────────────────────────────────┘   │
+│                 ┌──────────────────┐                        │
+│                 │ Neon PostgreSQL  │                        │
+│                 │  Record Storage  │                        │
+│                 └──────────────────┘                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Component Responsibilities
+## System Components
 
 ### 1. Evaluation Input / User Interface (Frontend)
-- Provides two interaction modes: Ask AI and Evaluate Response.
-- Collects user input: question, AI response, optional reference answer, optional source material.
-- Displays evaluation results with scores, evidence, and reasoning.
+- Single submission interface accepting User Question (required), AI Response to validate (required), optional Reference Ground Truth, and optional PDF Source Document.
+- Live multi-stage agent execution progress bar showing active pipeline status.
+- Results view featuring large PASS/FAIL verdict banner, composite score (out of 5.00), color-coded agent metric cards (Green/Yellow/Red), and top-10 retrieved evidence cards.
+- Evaluation History dashboard accessible from the top-right navbar to view past evaluations stored in Neon PostgreSQL.
 
 ### 2. Backend / API Layer (FastAPI)
-- `POST /api/chat` — Sends question to Gemini, returns AI response.
-- `POST /api/evaluate` — Receives evaluation submission, triggers evaluation pipeline.
-- `GET /` — Health check.
-- Handles input validation, error handling, and CORS.
+- `POST /api/evaluate` — Multipart endpoint receiving question, AI response, reference answer, and PDF file. Coordinates PDF parsing, top-10 RAG retrieval, multi-agent evaluation, and Neon DB persistence.
+- `GET /api/history` — Fetches past evaluation audit records from Neon PostgreSQL.
+- `GET /api/history/{id}` — Fetches details of a specific evaluation run.
+- `POST /api/retrieve` — Direct semantic vector search against FAISS benchmark index.
+- `GET /` — Backend health check.
 
-### 3. Evaluation Input Processing Module
-- Validates and preprocesses the evaluation submission.
-- Packages the question, AI response, reference answer, and source material for the pipeline.
-- Triggers RAG retrieval for additional evidence.
+### 3. Evaluation Input Processing & PDF Module
+- Validates non-empty input payloads.
+- Parses uploaded PDF files using `pypdf`, extracting plain text across all document pages and supplying text excerpts directly to the evaluation agents.
 
 ### 4. RAG Retrieval Pipeline
-- Embeds the submitted question using Sentence Transformers.
-- Searches the FAISS vector store for semantically similar content.
-- Returns relevant reference chunks as supporting evidence.
-- Evidence is passed to evaluation agents for informed assessment.
+- Embeds user queries using Sentence Transformers (`all-MiniLM-L6-v2`, 384 dimensions).
+- Searches normalized FAISS `IndexFlatIP` index using cosine similarity.
+- Retrieves the top 10 most relevant evidence chunks from TruthfulQA and SQuAD benchmark datasets.
 
-### 5. Agent Orchestrator
-- Coordinates the execution of all evaluation agents.
-- Passes the question, AI response, reference material, and retrieved evidence to each agent.
-- Collects results from all agents.
-- Passes all results to the Verdict Agent for final assessment.
+### 5. Agent Orchestrator & Evaluation Agents (Google Gemini)
+- **Relevance Judge Agent**: Evaluates if the AI response directly answers the user prompt (1.0 to 5.0 score + reasoning).
+- **Accuracy Judge Agent**: Verifies factual truthfulness against reference ground truth, PDF source text, and top-10 retrieved chunks (1.0 to 5.0 score + reasoning).
+- **Hallucination Detection Agent**: Scans specifically for fabricated statements, unsupported claims, or contradictions (1.0 to 5.0 score where 5 = zero hallucination + reasoning).
+- **Completeness Judge Agent**: Evaluates coverage depth and whether critical aspects are omitted (1.0 to 5.0 score + reasoning).
+- **Verdict Agent**: Computes weighted composite score `(0.25 * relevance) + (0.35 * accuracy) + (0.25 * hallucination) + (0.15 * completeness)`, issues final `PASS` or `FAIL` verdict, and provides an executive summary.
 
-### 6. Evaluation Agents
+### 6. Neon PostgreSQL Database Layer
+- Table `evaluation_records` stores full execution payloads: question, AI response, reference answer, source document name and text, individual agent scores and reasonings, composite score, final verdict, and retrieved evidence JSON.
 
-#### Relevance Judge Agent
-- **Input**: Question, AI response.
-- **Task**: Assess whether the response directly addresses the question.
-- **Output**: Relevance score (1-5) with reasoning.
+## Scoring Dimensions and Scale
 
-#### Accuracy Judge Agent
-- **Input**: Question, AI response, reference answer, retrieved evidence.
-- **Task**: Verify factual correctness of the response.
-- **Output**: Accuracy score (1-5) with reasoning.
+| Dimension | Scale | Thresholds | Description |
+|-----------|-------|------------|-------------|
+| Relevance | 1.0 - 5.0 | Green: $\ge 4.0$, Yellow: $3.0 - 3.9$, Red: $< 3.0$ | How directly the response answers the question |
+| Accuracy | 1.0 - 5.0 | Green: $\ge 4.0$, Yellow: $3.0 - 3.9$, Red: $< 3.0$ | Factual truthfulness against evidence and ground truth |
+| Hallucination | 1.0 - 5.0 | Green: $\ge 4.0$, Yellow: $3.0 - 3.9$, Red: $< 3.0$ | Degree of ungrounded or fabricated claims (5 = none) |
+| Completeness | 1.0 - 5.0 | Green: $\ge 4.0$, Yellow: $3.0 - 3.9$, Red: $< 3.0$ | Thoroughness of coverage |
 
-#### Hallucination Detection Agent
-- **Input**: Question, AI response, reference answer, source material, retrieved evidence.
-- **Task**: Identify claims not supported by evidence or reference material.
-- **Output**: Hallucination score (1-5, where 5 = no hallucination) with reasoning and flagged claims.
+### Verdict Criteria
 
-#### Completeness Judge Agent
-- **Input**: Question, AI response, reference answer.
-- **Task**: Assess whether all aspects of the question are thoroughly answered.
-- **Output**: Completeness score (1-5) with reasoning.
-
-#### Verdict Agent
-- **Input**: All scores and reasoning from the four judge agents.
-- **Task**: Produce final overall assessment.
-- **Output**: Overall verdict, confidence level, summary reasoning.
-
-### 7. Reference Knowledge Base
-- Stores preprocessed benchmark data from TruthfulQA and SQuAD.
-- Data is cleaned, chunked, embedded, and indexed in FAISS.
-- Provides semantic search for retrieving relevant reference content.
-- Each chunk includes metadata: source dataset, question, answer, category.
-
-### 8. Structured Evaluation Results
-- Aggregates all evaluation outputs into a structured format.
-- Contains individual dimension scores, reasoning, evidence, and final verdict.
-
-## Scoring System
-
-### Dimensions and Scale
-
-| Dimension | Scale | Description |
-|-----------|-------|-------------|
-| Relevance | 1-5 | How well the response addresses the question |
-| Accuracy | 1-5 | Factual correctness of the response |
-| Hallucination | 1-5 | Degree of unsupported or fabricated content (5 = none) |
-| Completeness | 1-5 | Thoroughness of the response |
-
-### Overall Verdict
-
-| Verdict | Criteria |
-|---------|----------|
-| Reliable | Average score >= 4, no dimension below 3 |
-| Partially Reliable | Average score >= 3, hallucination score >= 3 |
-| Unreliable | Average score < 3 or hallucination score < 3 |
-
-## Data Flow
-
-```
-1. User submits question + AI response (+ optional reference/source)
-       ↓
-2. Backend validates input
-       ↓
-3. RAG pipeline retrieves relevant evidence from knowledge base
-       ↓
-4. Orchestrator sends data to all four judge agents
-       ↓
-5. Each agent evaluates and returns score + reasoning
-       ↓
-6. Verdict Agent aggregates results → final verdict
-       ↓
-7. Structured results returned to frontend
-       ↓
-8. Dashboard displays scores, evidence, reasoning, verdict
-```
+- **PASS**: Composite Score $\ge 3.50$ AND Hallucination Score $\ge 3.00$
+- **FAIL**: Composite Score $< 3.50$ OR Hallucination Score $< 3.00$
 
 ## Implementation Status (Milestone 1)
 
-| Component | Status | Completed In |
-|-----------|--------|--------------|
-| Frontend (Ask AI) | ✅ Done | Day 1 |
-| Backend API (Chat) | ✅ Done | Day 1 |
-| Gemini API Integration | ✅ Done | Day 1 |
-| Research Documentation (M1.1) | ✅ Done | Day 2 (`docs/research.md`) |
-| System Architecture Design (M1.2) | ✅ Done | Day 2 (`docs/architecture.md`) |
-| Evaluation Input Module - API & UI (M1.3) | ✅ Done | Day 2 |
-| Benchmark Ingestion - TruthfulQA & SQuAD (M1.4) | ✅ Done | Day 3 (`backend/knowledge_base/ingest.py`) |
-| Embedding Generation - Sentence Transformers (M1.4) | ✅ Done | Day 3 (`backend/knowledge_base/embeddings.py`) |
-| Vector Database - FAISS Indexing (M1.4) | ✅ Done | Day 3 (`faiss.index`, 2,766 vectors) |
-| Semantic Retrieval & RAG Pipeline (M1.4) | ✅ Done | Day 3 (`POST /api/retrieve`, `POST /api/evaluate`) |
-| Results Dashboard Evidence Display (M1.4) | ✅ Done | Day 3 |
-| AI Evaluation Agents Layer (Scoring logic) | ⬜ Planned | Future Milestones |
-| Verdict Agent Logic | ⬜ Planned | Future Milestones |
-| Batch Evaluation Module | ⬜ Planned | Future Milestones |
-| Evaluation Report Generation | ⬜ Planned | Future Milestones |
-
+| Component | Status | Implementation Details |
+|-----------|--------|------------------------|
+| Research Documentation (M1.1) | ✅ Done | `docs/research.md` |
+| System Architecture Design (M1.2) | ✅ Done | `docs/architecture.md` |
+| Evaluation Input Module (M1.3) | ✅ Done | Single submission form with PDF upload |
+| Benchmark Ingestion (M1.4) | ✅ Done | TruthfulQA & SQuAD (`backend/knowledge_base/ingest.py`) |
+| Vector Embeddings (M1.4) | ✅ Done | MiniLM-L6-v2 (`backend/knowledge_base/embeddings.py`) |
+| FAISS Indexing (M1.4) | ✅ Done | 2,766 vectors in `backend/knowledge_base/data/faiss.index` |
+| Top-10 RAG Retrieval Pipeline (M1.4) | ✅ Done | `backend/knowledge_base/retrieval.py` |
+| Multi-Agent LLM Judges Layer | ✅ Done | Relevance, Accuracy, Hallucination, Completeness (`backend/agents/evaluator.py`) |
+| Verdict Agent | ✅ Done | PASS / FAIL verdict synthesis (`backend/agents/evaluator.py`) |
+| Evaluation Storage Database | ✅ Done | Neon PostgreSQL integration (`backend/database.py`) |
+| Evaluation History Dashboard | ✅ Done | Persistent history view in frontend navbar |
+| Agile & Testing Templates | ✅ Done | Backlog, Defect Tracker, Unit Test Plan |

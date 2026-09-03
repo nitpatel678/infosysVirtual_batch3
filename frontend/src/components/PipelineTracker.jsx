@@ -1,40 +1,56 @@
 import React from 'react'
-import { CheckCircle2, Loader2, Sparkles, Search, FileText } from 'lucide-react'
+import { CheckCircle2, Loader2, Search, ShieldCheck, FileCheck, AlertTriangle, Scale, Database } from 'lucide-react'
 
 export default function PipelineTracker({ currentStep, activeStepMessage }) {
   const steps = [
     {
       id: 1,
-      title: 'Input',
-      desc: 'Query received',
-      icon: FileText,
-    },
-    {
-      id: 2,
-      title: 'Response',
-      desc: 'Gemini generation',
-      icon: Sparkles,
-    },
-    {
-      id: 3,
-      title: 'Vector Search',
-      desc: 'FAISS retrieval',
+      title: 'Top-10 RAG Search',
+      desc: 'TruthfulQA & SQuAD FAISS',
       icon: Search,
     },
     {
+      id: 2,
+      title: 'Relevance Agent',
+      desc: 'Query intent check',
+      icon: FileCheck,
+    },
+    {
+      id: 3,
+      title: 'Accuracy Agent',
+      desc: 'Factual verification',
+      icon: ShieldCheck,
+    },
+    {
       id: 4,
-      title: 'Evidence',
-      desc: '5 chunks extracted',
-      icon: CheckCircle2,
+      title: 'Hallucination Agent',
+      desc: 'Fabrication detection',
+      icon: AlertTriangle,
+    },
+    {
+      id: 5,
+      title: 'Completeness Agent',
+      desc: 'Coverage depth',
+      icon: Scale,
+    },
+    {
+      id: 6,
+      title: 'Verdict & Neon DB',
+      desc: 'Final score & record saved',
+      icon: Database,
     },
   ]
 
-  const isComplete = currentStep >= 4
+  const isComplete = currentStep >= 6
+  const progressPercent = Math.min(100, Math.round((currentStep / 6) * 100))
 
   return (
     <div className="pipeline-card">
       <div className="pipeline-header">
-        <div className="pipeline-title">Status</div>
+        <div className="pipeline-title-group">
+          <span className="pipeline-title">Agent Orchestration Pipeline</span>
+          <span className="pipeline-percent">{progressPercent}%</span>
+        </div>
         {activeStepMessage && (
           <div className="pipeline-live-badge">
             {isComplete ? (
@@ -47,7 +63,14 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
         )}
       </div>
 
-      <div className="pipeline-steps">
+      <div className="pipeline-progress-bar-bg">
+        <div
+          className="pipeline-progress-bar-fill"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      <div className="pipeline-steps pipeline-steps-6">
         {steps.map((step) => {
           const isDone = isComplete ? true : currentStep > step.id
           const isActive = !isComplete && currentStep === step.id
@@ -62,9 +85,9 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
             >
               <div className="step-indicator">
                 {isDone ? (
-                  <CheckCircle2 size={15} className="text-white" />
+                  <CheckCircle2 size={14} className="text-white" />
                 ) : isActive ? (
-                  <Loader2 size={15} className="spin-icon text-white" />
+                  <Loader2 size={14} className="spin-icon text-white" />
                 ) : (
                   <span className="step-number">{step.id}</span>
                 )}

@@ -33,7 +33,7 @@ def _load():
             _metadata = json.load(f)
 
 
-def retrieve(query, top_k=5):
+def retrieve(query, top_k=10):
     _load()
 
     query_embedding = _model.encode([query])

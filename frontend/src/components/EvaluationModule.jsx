@@ -1,5 +1,21 @@
-import React, { useState } from 'react'
-import { Send, RotateCcw, AlertCircle, Loader2 } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import {
+  Send,
+  RotateCcw,
+  AlertCircle,
+  Loader2,
+  FileUp,
+  FileText,
+  X,
+  CheckCircle2,
+  XCircle,
+  ShieldAlert,
+  ShieldCheck,
+  Scale,
+  FileCheck,
+  Database,
+  Layers,
+} from 'lucide-react'
 import EvidenceCard from './EvidenceCard'
 import PipelineTracker from './PipelineTracker'
 
@@ -40,24 +56,108 @@ function renderFormattedText(text) {
   })
 }
 
-export default function EvaluationModule() {
+function getScoreColorClass(score) {
+  if (score >= 4.0) return 'score-card-green'
+  if (score >= 3.0) return 'score-card-yellow'
+  return 'score-card-red'
+}
+
+export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }) {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
   const [referenceAnswer, setReferenceAnswer] = useState('')
+  const [pdfFile, setPdfFile] = useState(null)
 
-  const [mode, setMode] = useState('auto')
   const [pipelineStep, setPipelineStep] = useState(0)
   const [stepMessage, setStepMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const [results, setResults] = useState(null)
+  const fileInputRef = useRef(null)
 
-  async function handleRunPipeline(e) {
+  useEffect(() => {
+    if (selectedEvalId) {
+      loadEvaluationById(selectedEvalId)
+    }
+  }, [selectedEvalId])
+
+  async function loadEvaluationById(id) {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/history/${id}`)
+      if (!res.ok) {
+        throw new Error('Failed to load evaluation details from database')
+      }
+      const data = await res.json()
+      const rec = data.record
+      if (rec) {
+        setQuestion(rec.question || '')
+        setAiResponse(rec.ai_response || '')
+        setReferenceAnswer(rec.reference_answer || '')
+        setResults({
+          id: rec.id,
+          created_at: rec.created_at,
+          input: {
+            question: rec.question,
+            ai_response: rec.ai_response,
+            reference_answer: rec.reference_answer,
+            source_document_name: rec.source_document_name,
+          },
+          retrieved_evidence: rec.retrieved_evidence || [],
+          scores: {
+            relevance: { score: rec.relevance_score, reasoning: rec.relevance_reasoning },
+            accuracy: { score: rec.accuracy_score, reasoning: rec.accuracy_reasoning },
+            hallucination: { score: rec.hallucination_score, reasoning: rec.hallucination_reasoning },
+            completeness: { score: rec.completeness_score, reasoning: rec.completeness_reasoning },
+            composite: rec.composite_score,
+          },
+          verdict: {
+            status: rec.final_verdict,
+            summary: rec.verdict_summary,
+          },
+        })
+        setPipelineStep(6)
+        setStepMessage('Loaded from Neon DB records')
+      }
+    } catch (err) {
+      setError(err.message || 'Error loading record.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        setError('Only PDF documents are allowed.')
+        setPdfFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
+      setError('')
+      setPdfFile(file)
+    }
+  }
+
+  function handleRemoveFile() {
+    setPdfFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleRunEvaluation(e) {
     if (e) e.preventDefault()
     const trimmedQ = question.trim()
+    const trimmedResp = aiResponse.trim()
+
     if (!trimmedQ) {
-      setError('Please enter a question.')
+      setError('Please enter the user question / query.')
+      return
+    }
+    if (!trimmedResp) {
+      setError('Please enter the AI response to be evaluated.')
       return
     }
 
@@ -65,56 +165,59 @@ export default function EvaluationModule() {
     setLoading(true)
     setResults(null)
 
-    let finalAiResponse = aiResponse.trim()
+    const formData = new FormData()
+    formData.append('question', trimmedQ)
+    formData.append('ai_response', trimmedResp)
+    if (referenceAnswer.trim()) {
+      formData.append('reference_answer', referenceAnswer.trim())
+    }
+    if (pdfFile) {
+      formData.append('source_document', pdfFile)
+    }
 
     try {
       setPipelineStep(1)
-      setStepMessage('Query received')
-      await new Promise((r) => setTimeout(r, 200))
+      setStepMessage('Parsing document & extracting Top-10 FAISS chunks...')
 
-      if (mode === 'auto' || !finalAiResponse) {
+      const stepTimer1 = setTimeout(() => {
         setPipelineStep(2)
-        setStepMessage('Generating Gemini response...')
+        setStepMessage('Relevance Judge Agent evaluating query alignment...')
+      }, 700)
 
-        const chatRes = await fetch('http://127.0.0.1:8000/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: trimmedQ }),
-        })
+      const stepTimer2 = setTimeout(() => {
+        setPipelineStep(3)
+        setStepMessage('Accuracy Judge Agent cross-referencing facts...')
+      }, 1500)
 
-        if (!chatRes.ok) {
-          const errData = await chatRes.json()
-          throw new Error(errData.detail || 'Failed to generate response')
-        }
+      const stepTimer3 = setTimeout(() => {
+        setPipelineStep(4)
+        setStepMessage('Hallucination Detection Agent checking claims...')
+      }, 2300)
 
-        const chatData = await chatRes.json()
-        finalAiResponse = chatData.response
-        setAiResponse(finalAiResponse)
-        await new Promise((r) => setTimeout(r, 200))
-      }
-
-      setPipelineStep(3)
-      setStepMessage('Searching benchmark vector index...')
+      const stepTimer4 = setTimeout(() => {
+        setPipelineStep(5)
+        setStepMessage('Completeness Judge Agent assessing answer depth...')
+      }, 3100)
 
       const evalRes = await fetch('http://127.0.0.1:8000/api/evaluate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: trimmedQ,
-          ai_response: finalAiResponse,
-          reference_answer: referenceAnswer.trim() || null,
-        }),
+        body: formData,
       })
+
+      clearTimeout(stepTimer1)
+      clearTimeout(stepTimer2)
+      clearTimeout(stepTimer3)
+      clearTimeout(stepTimer4)
 
       if (!evalRes.ok) {
         const errData = await evalRes.json()
-        throw new Error(errData.detail || 'Failed to search benchmarks')
+        throw new Error(errData.detail || 'Evaluation failed on backend')
       }
 
       const evalData = await evalRes.json()
 
-      setPipelineStep(4)
-      setStepMessage('Completed')
+      setPipelineStep(6)
+      setStepMessage('Evaluation complete • Saved to Neon DB')
       setResults(evalData)
     } catch (err) {
       setError(err.message || 'Could not connect to the backend server.')
@@ -128,108 +231,119 @@ export default function EvaluationModule() {
     setQuestion('')
     setAiResponse('')
     setReferenceAnswer('')
+    setPdfFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
     setResults(null)
     setPipelineStep(0)
     setError('')
+    if (onClearSelectedEval) onClearSelectedEval()
   }
 
   return (
     <div className="module-container">
       <div className="pipeline-controls">
-        <div className="mode-toggle-group">
-          <button
-            type="button"
-            className={`mode-btn ${mode === 'auto' ? 'mode-btn-active' : ''}`}
-            onClick={() => setMode('auto')}
-          >
-            Auto
-          </button>
-          <button
-            type="button"
-            className={`mode-btn ${mode === 'manual' ? 'mode-btn-active' : ''}`}
-            onClick={() => setMode('manual')}
-          >
-            Manual
-          </button>
+        <div className="module-title-group">
+          <span className="module-title">Evaluation Submission Module</span>
+          <span className="module-tag">Multi-Agent • Top-10 RAG</span>
         </div>
 
-        {results && (
+        {(results || question || aiResponse) && (
           <button type="button" onClick={handleReset} className="reset-btn">
             <RotateCcw size={13} />
-            <span>Reset</span>
+            <span>New Evaluation</span>
           </button>
         )}
       </div>
 
-      <form onSubmit={handleRunPipeline} className="pipeline-form">
+      <form onSubmit={handleRunEvaluation} className="pipeline-form">
         <div className="input-group">
-          <label className="input-label">Question</label>
-          <div className="input-with-button">
-            <input
-              type="text"
-              className="text-input"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask a question..."
-              disabled={loading}
-            />
-            {mode === 'auto' && (
-              <button
-                type="submit"
-                className="submit-icon-btn"
-                title="Send"
-                disabled={loading || !question.trim()}
-              >
-                {loading ? <Loader2 size={16} className="spin-icon" /> : <Send size={16} />}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {mode === 'manual' && (
-          <div className="input-group">
-            <label className="input-label">AI Response</label>
-            <textarea
-              className="textarea-input"
-              rows={3}
-              value={aiResponse}
-              onChange={(e) => setAiResponse(e.target.value)}
-              placeholder="Enter response to validate..."
-              disabled={loading}
-            />
-          </div>
-        )}
-
-        <div className="input-group">
-          <label className="input-label">Reference Answer (optional)</label>
+          <label className="input-label">
+            User Question / Query <span className="req-star">*</span>
+          </label>
           <input
             type="text"
-            className="text-input text-input-sm"
-            value={referenceAnswer}
-            onChange={(e) => setReferenceAnswer(e.target.value)}
-            placeholder="Ground truth answer (optional)..."
+            className="text-input"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Enter the prompt or question asked..."
             disabled={loading}
           />
         </div>
 
-        {mode === 'manual' && (
-          <div className="submit-action-row">
-            <button
-              type="submit"
-              className="submit-btn"
-              disabled={loading || !question.trim() || !aiResponse.trim()}
-            >
-              {loading ? (
-                <Loader2 size={16} className="spin-icon" />
-              ) : (
-                <>
-                  <span>Submit</span>
-                  <Send size={15} />
-                </>
-              )}
-            </button>
+        <div className="input-group">
+          <label className="input-label">
+            AI-Generated Response to Validate <span className="req-star">*</span>
+          </label>
+          <textarea
+            className="textarea-input"
+            rows={4}
+            value={aiResponse}
+            onChange={(e) => setAiResponse(e.target.value)}
+            placeholder="Paste or enter the AI response to evaluate for hallucination and accuracy..."
+            disabled={loading}
+          />
+        </div>
+
+        <div className="form-grid-2">
+          <div className="input-group">
+            <label className="input-label flex-between">
+              <span>Reference Ground Truth Answer</span>
+              <span className="optional-tag">Optional</span>
+            </label>
+            <input
+              type="text"
+              className="text-input text-input-sm"
+              value={referenceAnswer}
+              onChange={(e) => setReferenceAnswer(e.target.value)}
+              placeholder="Known factual ground truth answer (if available)..."
+              disabled={loading}
+            />
           </div>
-        )}
+
+          <div className="input-group">
+            <label className="input-label flex-between">
+              <span>Source Document (PDF Only)</span>
+              <span className="optional-tag">Optional</span>
+            </label>
+            <div className="pdf-upload-container">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".pdf"
+                style={{ display: 'none' }}
+                disabled={loading}
+              />
+              {pdfFile ? (
+                <div className="pdf-file-badge">
+                  <FileText size={15} />
+                  <span className="pdf-filename" title={pdfFile.name}>
+                    {pdfFile.name} ({(pdfFile.size / 1024).toFixed(0)} KB)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveFile}
+                    className="pdf-remove-btn"
+                    title="Remove PDF"
+                    disabled={loading}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="pdf-select-btn"
+                  disabled={loading}
+                >
+                  <FileUp size={14} />
+                  <span>Choose PDF Document</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
 
         {error && (
           <div className="error-card">
@@ -237,6 +351,26 @@ export default function EvaluationModule() {
             <span>{error}</span>
           </div>
         )}
+
+        <div className="submit-action-row">
+          <button
+            type="submit"
+            className="submit-btn"
+            disabled={loading || !question.trim() || !aiResponse.trim()}
+          >
+            {loading ? (
+              <>
+                <Loader2 size={16} className="spin-icon" />
+                <span>Evaluating with Multi-Agent Layer...</span>
+              </>
+            ) : (
+              <>
+                <span>Evaluate Response</span>
+                <Send size={15} />
+              </>
+            )}
+          </button>
+        </div>
       </form>
 
       {pipelineStep > 0 && (
@@ -245,15 +379,121 @@ export default function EvaluationModule() {
 
       {results && (
         <div className="results-container">
-          <div className="results-header">
-            <h2 className="results-title">Results</h2>
+          <div className={`verdict-banner ${results.verdict.status === 'PASS' ? 'verdict-banner-pass' : 'verdict-banner-fail'}`}>
+            <div className="verdict-banner-left">
+              <div className="verdict-icon-wrapper">
+                {results.verdict.status === 'PASS' ? (
+                  <CheckCircle2 size={28} />
+                ) : (
+                  <XCircle size={28} />
+                )}
+              </div>
+              <div>
+                <div className="verdict-label-row">
+                  <span className="verdict-status-title">
+                    FINAL VERDICT: {results.verdict.status}
+                  </span>
+                  {results.id && (
+                    <span className="verdict-record-id">Record #{results.id} (Neon DB)</span>
+                  )}
+                </div>
+                <p className="verdict-summary-text">{results.verdict.summary}</p>
+              </div>
+            </div>
+
+            <div className="verdict-banner-score">
+              <span className="composite-label">Composite Score</span>
+              <span className="composite-number">{results.scores.composite?.toFixed(2)}</span>
+              <span className="composite-max">/ 5.00</span>
+            </div>
+          </div>
+
+          <div className="agent-scores-section">
+            <h3 className="section-subtitle">Evaluation Agent Scores & Reasoning</h3>
+            <div className="agent-grid">
+              <div className={`agent-card ${getScoreColorClass(results.scores.relevance.score)}`}>
+                <div className="agent-card-header">
+                  <div className="agent-name-group">
+                    <FileCheck size={16} />
+                    <h4>Relevance Judge</h4>
+                  </div>
+                  <span className="agent-score-pill">
+                    {results.scores.relevance.score?.toFixed(1)} / 5.0
+                  </span>
+                </div>
+                <div className="score-bar-bg">
+                  <div
+                    className="score-bar-fill"
+                    style={{ width: `${(results.scores.relevance.score / 5) * 100}%` }}
+                  />
+                </div>
+                <p className="agent-reasoning">{results.scores.relevance.reasoning}</p>
+              </div>
+
+              <div className={`agent-card ${getScoreColorClass(results.scores.accuracy.score)}`}>
+                <div className="agent-card-header">
+                  <div className="agent-name-group">
+                    <ShieldCheck size={16} />
+                    <h4>Accuracy Judge</h4>
+                  </div>
+                  <span className="agent-score-pill">
+                    {results.scores.accuracy.score?.toFixed(1)} / 5.0
+                  </span>
+                </div>
+                <div className="score-bar-bg">
+                  <div
+                    className="score-bar-fill"
+                    style={{ width: `${(results.scores.accuracy.score / 5) * 100}%` }}
+                  />
+                </div>
+                <p className="agent-reasoning">{results.scores.accuracy.reasoning}</p>
+              </div>
+
+              <div className={`agent-card ${getScoreColorClass(results.scores.hallucination.score)}`}>
+                <div className="agent-card-header">
+                  <div className="agent-name-group">
+                    <ShieldAlert size={16} />
+                    <h4>Hallucination Detection</h4>
+                  </div>
+                  <span className="agent-score-pill">
+                    {results.scores.hallucination.score?.toFixed(1)} / 5.0
+                  </span>
+                </div>
+                <div className="score-bar-bg">
+                  <div
+                    className="score-bar-fill"
+                    style={{ width: `${(results.scores.hallucination.score / 5) * 100}%` }}
+                  />
+                </div>
+                <p className="agent-reasoning">{results.scores.hallucination.reasoning}</p>
+              </div>
+
+              <div className={`agent-card ${getScoreColorClass(results.scores.completeness.score)}`}>
+                <div className="agent-card-header">
+                  <div className="agent-name-group">
+                    <Scale size={16} />
+                    <h4>Completeness Judge</h4>
+                  </div>
+                  <span className="agent-score-pill">
+                    {results.scores.completeness.score?.toFixed(1)} / 5.0
+                  </span>
+                </div>
+                <div className="score-bar-bg">
+                  <div
+                    className="score-bar-fill"
+                    style={{ width: `${(results.scores.completeness.score / 5) * 100}%` }}
+                  />
+                </div>
+                <p className="agent-reasoning">{results.scores.completeness.reasoning}</p>
+              </div>
+            </div>
           </div>
 
           <div className="results-grid">
             <div className="result-column">
               <div className="column-card">
                 <div className="card-header">
-                  <h3>AI Response</h3>
+                  <h3>Evaluated AI Response</h3>
                 </div>
 
                 <div className="ai-response-content">
@@ -262,8 +502,15 @@ export default function EvaluationModule() {
 
                 {results.input.reference_answer && (
                   <div className="card-sub-block">
-                    <span className="sub-block-label">Ground Truth:</span>
+                    <span className="sub-block-label">Reference Ground Truth:</span>
                     <p className="sub-block-text">{results.input.reference_answer}</p>
+                  </div>
+                )}
+
+                {results.input.source_document_name && (
+                  <div className="card-sub-block">
+                    <span className="sub-block-label">Uploaded Source Document:</span>
+                    <p className="sub-block-text">{results.input.source_document_name}</p>
                   </div>
                 )}
               </div>
@@ -271,8 +518,11 @@ export default function EvaluationModule() {
 
             <div className="result-column">
               <div className="column-card">
-                <div className="card-header">
-                  <h3>Retrieved Evidence ({results.retrieved_evidence ? results.retrieved_evidence.length : 0})</h3>
+                <div className="card-header flex-between">
+                  <h3>Top-10 Grounding Evidence (TruthfulQA & SQuAD)</h3>
+                  <span className="evidence-count-badge">
+                    {results.retrieved_evidence ? results.retrieved_evidence.length : 0} Chunks
+                  </span>
                 </div>
 
                 <div className="evidence-cards-list">
@@ -282,7 +532,7 @@ export default function EvaluationModule() {
                     ))
                   ) : (
                     <div className="empty-evidence">
-                      <p>No matching evidence chunks found.</p>
+                      <p>No matching evidence chunks found in FAISS knowledge base.</p>
                     </div>
                   )}
                 </div>

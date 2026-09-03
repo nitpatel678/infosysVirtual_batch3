@@ -1,3 +1,7 @@
+import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
 from knowledge_base.retrieval import retrieve
 
 test_queries = [
