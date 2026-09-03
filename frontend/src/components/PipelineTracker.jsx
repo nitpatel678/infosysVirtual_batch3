@@ -5,26 +5,26 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
   const steps = [
     {
       id: 1,
-      title: 'Prompt Submission',
-      desc: 'Query analysis & payload prep',
+      title: 'Input',
+      desc: 'Query received',
       icon: FileText,
     },
     {
       id: 2,
-      title: 'Gemini Generation',
-      desc: 'Automated AI response',
+      title: 'Response',
+      desc: 'Gemini generation',
       icon: Sparkles,
     },
     {
       id: 3,
-      title: 'FAISS Vector Search',
-      desc: '384-d semantic cosine search',
+      title: 'Vector Search',
+      desc: 'FAISS retrieval',
       icon: Search,
     },
     {
       id: 4,
-      title: 'RAG Grounding Extracted',
-      desc: 'TruthfulQA & SQuAD evidence',
+      title: 'Evidence',
+      desc: '5 chunks extracted',
       icon: CheckCircle2,
     },
   ]
@@ -34,7 +34,7 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
   return (
     <div className="pipeline-card">
       <div className="pipeline-header">
-        <div className="pipeline-title">RAG EXECUTION PIPELINE</div>
+        <div className="pipeline-title">Status</div>
         {activeStepMessage && (
           <div className="pipeline-live-badge">
             {isComplete ? (
@@ -62,9 +62,9 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
             >
               <div className="step-indicator">
                 {isDone ? (
-                  <CheckCircle2 size={16} className="text-white" />
+                  <CheckCircle2 size={15} className="text-white" />
                 ) : isActive ? (
-                  <Loader2 size={16} className="spin-icon text-white" />
+                  <Loader2 size={15} className="spin-icon text-white" />
                 ) : (
                   <span className="step-number">{step.id}</span>
                 )}

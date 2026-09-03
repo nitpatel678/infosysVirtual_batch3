@@ -42,7 +42,7 @@ class EvaluateRequest(BaseModel):
 
 class RetrieveRequest(BaseModel):
     query: str
-    top_k: Optional[int] = 3
+    top_k: Optional[int] = 10
 
 
 @app.get("/")
@@ -69,7 +69,7 @@ def api_retrieve(request: RetrieveRequest):
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    top_k = max(1, min(request.top_k or 3, 10))
+    top_k = max(1, min(request.top_k or 5, 10))
     try:
         from knowledge_base.retrieval import retrieve
         results = retrieve(query, top_k=top_k)
@@ -94,7 +94,7 @@ def evaluate(request: EvaluateRequest):
     retrieved_evidence = []
     try:
         from knowledge_base.retrieval import retrieve
-        retrieved_evidence = retrieve(question, top_k=3)
+        retrieved_evidence = retrieve(question, top_k=5)
     except Exception as e:
         print(f"Warning: RAG retrieval failed: {e}")
 

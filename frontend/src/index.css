@@ -1,26 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600&family=Montserrat:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600&family=Montserrat:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap');
 
 :root {
-  --bg-primary: #09090b;
-  --bg-secondary: #121215;
-  --bg-tertiary: #18181b;
-  --bg-elevated: #202024;
-  --border-subtle: #27272a;
-  --border-active: #3f3f46;
-  --border-highlight: #ffffff;
+  --bg-primary: #121214;
+  --bg-secondary: #1a1a1e;
+  --bg-tertiary: #222226;
+  --border-subtle: #2d2d32;
+  --border-active: #3e3e44;
   
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
-  --text-inverse: #09090b;
+  --text-primary: #f0f0f2;
+  --text-secondary: #a0a0a6;
+  --text-tertiary: #707076;
   
-  --accent-white: #ffffff;
-  --accent-dim: #d4d4d8;
-  --badge-bg: #27272a;
-  
-  --font-outfit: 'Outfit', -apple-system, sans-serif;
-  --font-montserrat: 'Montserrat', sans-serif;
-  --font-body: 'Geologica', 'Poppins', sans-serif;
+  --font-heading: 'Outfit', -apple-system, sans-serif;
+  --font-body: 'Poppins', -apple-system, sans-serif;
 }
 
 * {
@@ -32,14 +24,9 @@
 body {
   font-family: var(--font-body);
   background-color: var(--bg-primary);
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-    linear-gradient(to bottom, #09090b, #0c0c0e);
   color: var(--text-primary);
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 ::-webkit-scrollbar {
@@ -50,11 +37,8 @@ body {
   background: var(--bg-primary);
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: var(--border-subtle);
   border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
 }
 
 #root {

@@ -1,6 +1,4 @@
-# Environment variables
 .env
-
 __pycache__/
 *.pyc
 venv/
@@ -8,12 +6,7 @@ node_modules/
 dist/
 .vscode/
 .idea/
-
 .DS_Store
 Thumbs.db
-
-# project_google_meet_notes
 dont_touch/
-
-# Knowledge base data (generated locally)
 backend/knowledge_base/data/
