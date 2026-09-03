@@ -5,8 +5,8 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
   const steps = [
     {
       id: 1,
-      title: 'Top-10 RAG Search',
-      desc: 'TruthfulQA & SQuAD FAISS',
+      title: 'RAG Retrieval',
+      desc: 'Benchmark Knowledge Base',
       icon: Search,
     },
     {
@@ -85,9 +85,9 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
             >
               <div className="step-indicator">
                 {isDone ? (
-                  <CheckCircle2 size={14} className="text-white" />
+                  <CheckCircle2 size={13} className="text-white" />
                 ) : isActive ? (
-                  <Loader2 size={14} className="spin-icon text-white" />
+                  <Loader2 size={13} className="spin-icon text-white" />
                 ) : (
                   <span className="step-number">{step.id}</span>
                 )}

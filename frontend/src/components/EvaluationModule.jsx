@@ -15,6 +15,7 @@ import {
   FileCheck,
   Database,
   Layers,
+  Sparkles,
 } from 'lucide-react'
 import EvidenceCard from './EvidenceCard'
 import PipelineTracker from './PipelineTracker'
@@ -177,7 +178,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
     try {
       setPipelineStep(1)
-      setStepMessage('Parsing document & extracting Top-10 FAISS chunks...')
+      setStepMessage('Extracting RAG grounding chunks from benchmark knowledge base...')
 
       const stepTimer1 = setTimeout(() => {
         setPipelineStep(2)
@@ -244,7 +245,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
       <div className="pipeline-controls">
         <div className="module-title-group">
           <span className="module-title">Evaluation Submission Module</span>
-          <span className="module-tag">Multi-Agent • Top-10 RAG</span>
+          <span className="module-tag">Multi-Agent • RAG Grounded</span>
         </div>
 
         {(results || question || aiResponse) && (
@@ -379,37 +380,66 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
       {results && (
         <div className="results-container">
-          <div className={`verdict-banner ${results.verdict.status === 'PASS' ? 'verdict-banner-pass' : 'verdict-banner-fail'}`}>
-            <div className="verdict-banner-left">
-              <div className="verdict-icon-wrapper">
-                {results.verdict.status === 'PASS' ? (
-                  <CheckCircle2 size={28} />
-                ) : (
-                  <XCircle size={28} />
+          <div className="top-response-card">
+            <div className="top-response-header">
+              <div className="top-response-meta">
+                <span className="section-badge">Evaluated AI Response & Input</span>
+                {results.id && (
+                  <span className="db-record-tag">Record #{results.id} • Neon DB</span>
                 )}
               </div>
-              <div>
-                <div className="verdict-label-row">
-                  <span className="verdict-status-title">
-                    FINAL VERDICT: {results.verdict.status}
-                  </span>
-                  {results.id && (
-                    <span className="verdict-record-id">Record #{results.id} (Neon DB)</span>
-                  )}
+
+              <div className="top-score-box">
+                <div className="top-score-details">
+                  <span className="top-score-title">Composite Score</span>
+                  <div className="top-score-val-row">
+                    <span className="top-score-number">{results.scores.composite?.toFixed(2)}</span>
+                    <span className="top-score-scale">/ 5.00</span>
+                  </div>
                 </div>
-                <p className="verdict-summary-text">{results.verdict.summary}</p>
+                <div className={`verdict-mini-badge ${results.verdict.status === 'PASS' ? 'verdict-mini-pass' : 'verdict-mini-fail'}`}>
+                  {results.verdict.status === 'PASS' ? (
+                    <CheckCircle2 size={14} />
+                  ) : (
+                    <XCircle size={14} />
+                  )}
+                  <span>{results.verdict.status}</span>
+                </div>
               </div>
             </div>
 
-            <div className="verdict-banner-score">
-              <span className="composite-label">Composite Score</span>
-              <span className="composite-number">{results.scores.composite?.toFixed(2)}</span>
-              <span className="composite-max">/ 5.00</span>
+            <div className="ai-response-content">
+              {renderFormattedText(results.input.ai_response)}
+            </div>
+
+            <div className="context-subgrid">
+              <div className="context-item">
+                <span className="context-label">User Query:</span>
+                <p className="context-value">{results.input.question}</p>
+              </div>
+
+              {results.input.reference_answer && (
+                <div className="context-item">
+                  <span className="context-label">Reference Ground Truth:</span>
+                  <p className="context-value">{results.input.reference_answer}</p>
+                </div>
+              )}
+
+              {results.input.source_document_name && (
+                <div className="context-item">
+                  <span className="context-label">Source Document:</span>
+                  <p className="context-value">{results.input.source_document_name}</p>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="agent-scores-section">
-            <h3 className="section-subtitle">Evaluation Agent Scores & Reasoning</h3>
+            <div className="section-header-row">
+              <h3 className="section-subtitle">Specialized Judge Agents (Individual Scores & Reasoning)</h3>
+              <span className="text-muted-tag">4 Independent Evaluators</span>
+            </div>
+
             <div className="agent-grid">
               <div className={`agent-card ${getScoreColorClass(results.scores.relevance.score)}`}>
                 <div className="agent-card-header">
@@ -489,54 +519,54 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
             </div>
           </div>
 
-          <div className="results-grid">
-            <div className="result-column">
-              <div className="column-card">
-                <div className="card-header">
-                  <h3>Evaluated AI Response</h3>
-                </div>
-
-                <div className="ai-response-content">
-                  {renderFormattedText(results.input.ai_response)}
-                </div>
-
-                {results.input.reference_answer && (
-                  <div className="card-sub-block">
-                    <span className="sub-block-label">Reference Ground Truth:</span>
-                    <p className="sub-block-text">{results.input.reference_answer}</p>
-                  </div>
+          <div className={`verdict-banner ${results.verdict.status === 'PASS' ? 'verdict-banner-pass' : 'verdict-banner-fail'}`}>
+            <div className="verdict-banner-left">
+              <div className="verdict-icon-wrapper">
+                {results.verdict.status === 'PASS' ? (
+                  <CheckCircle2 size={26} />
+                ) : (
+                  <XCircle size={26} />
                 )}
-
-                {results.input.source_document_name && (
-                  <div className="card-sub-block">
-                    <span className="sub-block-label">Uploaded Source Document:</span>
-                    <p className="sub-block-text">{results.input.source_document_name}</p>
-                  </div>
-                )}
+              </div>
+              <div>
+                <div className="verdict-label-row">
+                  <span className="verdict-status-title">
+                    FINAL VERDICT: {results.verdict.status}
+                  </span>
+                  <span className="verdict-sub-tag">Synthesized by Verdict Agent</span>
+                </div>
+                <p className="verdict-summary-text">{results.verdict.summary}</p>
               </div>
             </div>
 
-            <div className="result-column">
-              <div className="column-card">
-                <div className="card-header flex-between">
-                  <h3>Top-10 Grounding Evidence (TruthfulQA & SQuAD)</h3>
-                  <span className="evidence-count-badge">
-                    {results.retrieved_evidence ? results.retrieved_evidence.length : 0} Chunks
-                  </span>
-                </div>
+            <div className="verdict-banner-score">
+              <span className="composite-label">Overall Composite</span>
+              <span className="composite-number">{results.scores.composite?.toFixed(2)}</span>
+              <span className="composite-max">/ 5.00</span>
+            </div>
+          </div>
 
-                <div className="evidence-cards-list">
-                  {results.retrieved_evidence && results.retrieved_evidence.length > 0 ? (
-                    results.retrieved_evidence.map((evidence, idx) => (
-                      <EvidenceCard key={idx} evidence={evidence} index={idx} />
-                    ))
-                  ) : (
-                    <div className="empty-evidence">
-                      <p>No matching evidence chunks found in FAISS knowledge base.</p>
-                    </div>
-                  )}
-                </div>
+          <div className="column-card">
+            <div className="card-header flex-between">
+              <div>
+                <h3>RAG Grounding Evidence (TruthfulQA & SQuAD)</h3>
+                <p className="evidence-desc-text">Retrieved semantic evidence used by judge agents to verify factual truth</p>
               </div>
+              <span className="evidence-count-badge">
+                {results.retrieved_evidence ? results.retrieved_evidence.length : 0} Chunks
+              </span>
+            </div>
+
+            <div className="evidence-cards-list">
+              {results.retrieved_evidence && results.retrieved_evidence.length > 0 ? (
+                results.retrieved_evidence.map((evidence, idx) => (
+                  <EvidenceCard key={idx} evidence={evidence} index={idx} />
+                ))
+              ) : (
+                <div className="empty-evidence">
+                  <p>No matching evidence chunks found in FAISS knowledge base.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
