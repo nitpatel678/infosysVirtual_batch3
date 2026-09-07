@@ -35,8 +35,8 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
     },
     {
       id: 6,
-      title: 'Verdict & Neon DB',
-      desc: 'Final score & record saved',
+      title: 'Verdict & Results',
+      desc: 'Final score & stored',
       icon: Database,
     },
   ]

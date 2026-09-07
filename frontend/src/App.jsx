@@ -8,6 +8,11 @@ function App() {
   const [activeView, setActiveView] = useState('evaluate')
   const [selectedEvalId, setSelectedEvalId] = useState(null)
 
+  function handleNavigateHome() {
+    setSelectedEvalId(null)
+    setActiveView('evaluate')
+  }
+
   function handleSelectFromHistory(evalId) {
     setSelectedEvalId(evalId)
     setActiveView('evaluate')
@@ -19,13 +24,17 @@ function App() {
 
   return (
     <div className="app-layout">
-      <Navbar activeView={activeView} setActiveView={setActiveView} />
+      <Navbar
+        activeView={activeView}
+        setActiveView={setActiveView}
+        onNavigateHome={handleNavigateHome}
+      />
 
       <main className="main-content">
         <section className="hero-section">
-          <h1 className="hero-heading">AI Response Validation System</h1>
+          <h1 className="hero-heading">AI Response Validator</h1>
           <p className="hero-subheading">
-            Multi-agent evaluation platform verifying AI response credibility, hallucination, and factual grounding against benchmark datasets and source documents.
+            Evaluate accuracy, hallucination, and factual grounding against reference benchmarks.
           </p>
         </section>
 
@@ -45,7 +54,7 @@ function App() {
       <footer className="footer">
         <div className="footer-container">
           <div className="footer-title">Infosys Springboard Virtual Internship</div>
-          <div className="footer-details">Project #M-3-5 • Nitin Patel • Neon DB Integration</div>
+          <div className="footer-details">Project #M-3-5 • Nitin Patel</div>
         </div>
       </footer>
     </div>

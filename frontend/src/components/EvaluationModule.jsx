@@ -120,7 +120,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
           },
         })
         setPipelineStep(6)
-        setStepMessage('Loaded from Neon DB records')
+        setStepMessage('Loaded from evaluation records')
       }
     } catch (err) {
       setError(err.message || 'Error loading record.')
@@ -218,7 +218,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
       const evalData = await evalRes.json()
 
       setPipelineStep(6)
-      setStepMessage('Evaluation complete • Saved to Neon DB')
+      setStepMessage('Evaluation complete • Saved to database')
       setResults(evalData)
     } catch (err) {
       setError(err.message || 'Could not connect to the backend server.')
@@ -242,45 +242,40 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
   return (
     <div className="module-container">
-      <div className="pipeline-controls">
-        <div className="module-title-group">
-          <span className="module-title">Evaluation Submission Module</span>
-          <span className="module-tag">Multi-Agent • RAG Grounded</span>
-        </div>
-
-        {(results || question || aiResponse) && (
-          <button type="button" onClick={handleReset} className="reset-btn">
-            <RotateCcw size={13} />
-            <span>New Evaluation</span>
-          </button>
-        )}
-      </div>
-
       <form onSubmit={handleRunEvaluation} className="pipeline-form">
+        <div className="form-header">
+          <span className="form-title">Evaluate Response</span>
+          {(results || question || aiResponse) && (
+            <button type="button" onClick={handleReset} className="reset-btn">
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
         <div className="input-group">
           <label className="input-label">
-            User Question / Query <span className="req-star">*</span>
+            User Question <span className="req-star">*</span>
           </label>
           <input
             type="text"
             className="text-input"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Enter the prompt or question asked..."
+            placeholder="Type question here..."
             disabled={loading}
           />
         </div>
 
         <div className="input-group">
           <label className="input-label">
-            AI-Generated Response to Validate <span className="req-star">*</span>
+            AI Response to Validate <span className="req-star">*</span>
           </label>
           <textarea
             className="textarea-input"
             rows={4}
             value={aiResponse}
             onChange={(e) => setAiResponse(e.target.value)}
-            placeholder="Paste or enter the AI response to evaluate for hallucination and accuracy..."
+            placeholder="Paste AI response to evaluate..."
             disabled={loading}
           />
         </div>
@@ -288,7 +283,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
         <div className="form-grid-2">
           <div className="input-group">
             <label className="input-label flex-between">
-              <span>Reference Ground Truth Answer</span>
+              <span>Reference Answer</span>
               <span className="optional-tag">Optional</span>
             </label>
             <input
@@ -296,14 +291,14 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               className="text-input text-input-sm"
               value={referenceAnswer}
               onChange={(e) => setReferenceAnswer(e.target.value)}
-              placeholder="Known factual ground truth answer (if available)..."
+              placeholder="Reference ground truth (optional)..."
               disabled={loading}
             />
           </div>
 
           <div className="input-group">
             <label className="input-label flex-between">
-              <span>Source Document (PDF Only)</span>
+              <span>Source Document (PDF)</span>
               <span className="optional-tag">Optional</span>
             </label>
             <div className="pdf-upload-container">
@@ -361,13 +356,13 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
           >
             {loading ? (
               <>
-                <Loader2 size={16} className="spin-icon" />
-                <span>Evaluating with Multi-Agent Layer...</span>
+                <Loader2 size={15} className="spin-icon" />
+                <span>Evaluating...</span>
               </>
             ) : (
               <>
-                <span>Evaluate Response</span>
-                <Send size={15} />
+                <span>Evaluate</span>
+                <Send size={14} />
               </>
             )}
           </button>
@@ -383,9 +378,9 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
           <div className="top-response-card">
             <div className="top-response-header">
               <div className="top-response-meta">
-                <span className="section-badge">Evaluated AI Response & Input</span>
+                <span className="section-badge">Evaluated AI Response</span>
                 {results.id && (
-                  <span className="db-record-tag">Record #{results.id} • Neon DB</span>
+                  <span className="db-record-tag">Record #{results.id}</span>
                 )}
               </div>
 
@@ -436,8 +431,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
           <div className="agent-scores-section">
             <div className="section-header-row">
-              <h3 className="section-subtitle">Specialized Judge Agents (Individual Scores & Reasoning)</h3>
-              <span className="text-muted-tag">4 Independent Evaluators</span>
+              <h3 className="section-subtitle">Evaluation Agent Scores & Reasoning</h3>
             </div>
 
             <div className="agent-grid">
@@ -533,7 +527,6 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <span className="verdict-status-title">
                     FINAL VERDICT: {results.verdict.status}
                   </span>
-                  <span className="verdict-sub-tag">Synthesized by Verdict Agent</span>
                 </div>
                 <p className="verdict-summary-text">{results.verdict.summary}</p>
               </div>
@@ -549,8 +542,8 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
           <div className="column-card">
             <div className="card-header flex-between">
               <div>
-                <h3>RAG Grounding Evidence (TruthfulQA & SQuAD)</h3>
-                <p className="evidence-desc-text">Retrieved semantic evidence used by judge agents to verify factual truth</p>
+                <h3>Grounding Evidence</h3>
+                <p className="evidence-desc-text">Retrieved semantic evidence from benchmark knowledge base</p>
               </div>
               <span className="evidence-count-badge">
                 {results.retrieved_evidence ? results.retrieved_evidence.length : 0} Chunks
