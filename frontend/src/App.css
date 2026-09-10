@@ -426,85 +426,351 @@
   transition: width 0.4s ease;
 }
 
-.pipeline-steps-6 {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
+/* ==========================================================================
+/* ==========================================================================
+   Agent Orchestration Flow (Spacious 3-Stage Vertical-Branched Architecture)
+   ========================================================================== */
+.orch-flow-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
   box-sizing: border-box;
 }
 
-@media (max-width: 900px) {
-  .pipeline-steps-6 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.orch-stage-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.25s ease;
 }
 
-@media (max-width: 600px) {
-  .pipeline-steps-6 {
-    grid-template-columns: 1fr;
-  }
+.stage-box-active {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.04);
 }
 
-.pipeline-step {
+.stage-box-done {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.orch-stage-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stage-left-info,
+.stage-right-info {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 8px 8px;
-  min-width: 0;
-  box-sizing: border-box;
-  overflow: hidden;
 }
 
-.step-indicator {
-  width: 22px;
-  height: 22px;
+.stage-step-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.stage-tag-parallel {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.stage-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stage-badge-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.stage-status-text {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.status-text-active {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.status-text-done {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+/* Single Stage Cards (Stage 1 & 3) */
+.orch-stage-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 12px 14px;
+  transition: all 0.25s ease;
+}
+
+.orch-card-icon-wrap {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.orch-card-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.orch-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.orch-card-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+/* Parallel Judges Grid inside Stage 2 */
+.orch-parallel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 700px) {
+  .orch-parallel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.orch-agent-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 11px 13px;
+  min-width: 0;
+  transition: all 0.25s ease;
+}
+
+/* Flow Bridges (Connectors between Stages) */
+.orch-flow-bridge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 2px 8px;
+  color: var(--text-tertiary);
+}
+
+.bridge-line {
+  height: 1px;
+  flex: 1;
+  background: var(--border-subtle);
+  transition: background 0.3s ease;
+}
+
+.bridge-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10.5px;
   font-weight: 600;
   color: var(--text-tertiary);
-  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 12px;
+  border-radius: 14px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
 }
 
-.step-active {
+.fork-icon {
+  transform: rotate(90deg);
+}
+
+.bridge-lit .bridge-line {
+  background: rgba(34, 197, 94, 0.4);
+}
+
+.bridge-lit .bridge-pill {
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.bridge-active .bridge-line {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.bridge-active .bridge-pill {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Card Active / Pulse / Done States */
+.card-active {
   border-color: #ffffff;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.06);
 }
 
-.step-done .step-indicator {
-  background: #3e3e44;
+.card-active .orch-card-icon-wrap {
+  background: #ffffff;
+  color: #000000;
+}
+
+@keyframes agentCardPulse {
+  0%, 100% {
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+  }
+  50% {
+    border-color: #ffffff;
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.15);
+  }
+}
+
+.card-pulse {
+  animation: agentCardPulse 1.8s ease-in-out infinite;
+}
+
+.card-done {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.025);
+}
+
+.card-done .orch-card-icon-wrap {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+/* ==========================================================================
+   Agent Scores Tabs Navigation & Full-Width Tab Views
+   ========================================================================== */
+.agent-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.agent-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.agent-tab-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  background: var(--bg-tertiary);
+}
+
+.agent-tab-btn.tab-active {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  font-weight: 600;
+}
+
+.tab-score-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.agent-tab-btn.tab-active .tab-score-pill {
+  background: #000000;
   color: #ffffff;
 }
 
-.step-info {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
+.tab-btn-overview {
+  margin-left: auto;
 }
 
-.step-name {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+@media (max-width: 800px) {
+  .tab-btn-overview {
+    margin-left: 0;
+  }
 }
 
-.step-desc {
-  font-size: 10px;
+.agent-card-full {
+  width: 100%;
+  padding: 18px 20px;
+  box-sizing: border-box;
+}
+
+.agent-card-full .agent-reasoning {
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 6px 0;
+}
+
+.agent-card-full .claims-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+.section-hint-badge {
+  font-size: 11px;
   color: var(--text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
+
+
 
 .results-container {
   display: flex;
@@ -676,21 +942,26 @@
   border-radius: 4px;
 }
 
-.agent-grid {
+.agent-grid,
+.agent-grid-2col {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
-@media (max-width: 850px) {
-  .agent-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.agent-col-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
-@media (max-width: 500px) {
-  .agent-grid {
+@media (max-width: 900px) {
+  .agent-grid,
+  .agent-grid-2col {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 }
 
@@ -779,6 +1050,166 @@
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.45;
+}
+
+.agent-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-sub-pill {
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.hal-status-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.hal-tag-clean {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.hal-tag-warn {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.agent-sub-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-sub-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.agent-sub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-sub-item {
+  font-size: 11.5px;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.item-align {
+  color: var(--text-secondary);
+}
+
+.item-align .sub-bullet {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+.item-missed {
+  color: #facc15;
+}
+
+.item-missed .sub-bullet {
+  color: #eab308;
+  font-weight: bold;
+}
+
+.claims-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.claim-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  padding: 7px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.claim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.claim-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-supported, .badge-grounded {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.badge-contradicted, .badge-ungrounded {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-unverified, .badge-uncertain {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.claim-src {
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.claim-text {
+  font-size: 11.5px;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.claim-expl {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
 }
 
 .verdict-banner {

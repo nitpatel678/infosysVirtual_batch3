@@ -39,8 +39,14 @@ def init_db():
                     composite_score REAL NOT NULL,
                     final_verdict VARCHAR(20) NOT NULL,
                     verdict_summary TEXT NOT NULL,
-                    retrieved_evidence JSONB
+                    retrieved_evidence JSONB,
+                    relevance_details JSONB,
+                    accuracy_details JSONB,
+                    hallucination_details JSONB
                 );
+                ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS relevance_details JSONB;
+                ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS accuracy_details JSONB;
+                ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS hallucination_details JSONB;
             """)
             conn.commit()
     finally:
@@ -65,6 +71,9 @@ def save_evaluation(
     final_verdict,
     verdict_summary,
     retrieved_evidence,
+    relevance_details=None,
+    accuracy_details=None,
+    hallucination_details=None,
 ):
     init_db()
     conn = get_connection()
@@ -88,9 +97,12 @@ def save_evaluation(
                     composite_score,
                     final_verdict,
                     verdict_summary,
-                    retrieved_evidence
+                    retrieved_evidence,
+                    relevance_details,
+                    accuracy_details,
+                    hallucination_details
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 ) RETURNING *;
             """, (
                 question,
@@ -110,6 +122,9 @@ def save_evaluation(
                 final_verdict,
                 verdict_summary,
                 json.dumps(retrieved_evidence or []),
+                json.dumps(relevance_details or {}),
+                json.dumps(accuracy_details or {}),
+                json.dumps(hallucination_details or {}),
             ))
             row = cur.fetchone()
             conn.commit()
@@ -137,7 +152,10 @@ def get_evaluations(limit=50):
                     completeness_score,
                     composite_score,
                     final_verdict,
-                    verdict_summary
+                    verdict_summary,
+                    relevance_details,
+                    accuracy_details,
+                    hallucination_details
                 FROM evaluation_records
                 ORDER BY created_at DESC
                 LIMIT %s;
@@ -146,6 +164,7 @@ def get_evaluations(limit=50):
             return [dict(r) for r in rows]
     finally:
         conn.close()
+
 
 
 def get_evaluation_by_id(eval_id):

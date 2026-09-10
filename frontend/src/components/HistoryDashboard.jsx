@@ -10,9 +10,11 @@ import {
   RotateCcw,
   FileCheck,
   ShieldCheck,
+  ShieldAlert,
   AlertTriangle,
   Scale,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react'
 
 export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
@@ -23,6 +25,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
   const [recordDetail, setRecordDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
+  const [activeAgentTab, setActiveAgentTab] = useState('relevance')
 
   async function fetchHistory() {
     setLoading(true)
@@ -196,18 +199,75 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
             <div className="agent-scores-section">
               <div className="section-header-row">
                 <h3 className="section-subtitle">Evaluation Agent Scores & Reasoning</h3>
+                <span className="section-hint-badge">Click tabs to view full agent breakdown</span>
               </div>
 
-              <div className="agent-grid">
-                <div className={`agent-card ${getScoreColorClass(recordDetail.relevance_score)}`}>
+              {/* Agent Navigation Tabs */}
+              <div className="agent-tabs-nav">
+                <button
+                  type="button"
+                  className={`agent-tab-btn ${activeAgentTab === 'relevance' ? 'tab-active' : ''}`}
+                  onClick={() => setActiveAgentTab('relevance')}
+                >
+                  <FileCheck size={14} />
+                  <span>Relevance Judge</span>
+                  <span className="tab-score-pill">{recordDetail.relevance_score?.toFixed(1)}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`agent-tab-btn ${activeAgentTab === 'accuracy' ? 'tab-active' : ''}`}
+                  onClick={() => setActiveAgentTab('accuracy')}
+                >
+                  <ShieldCheck size={14} />
+                  <span>Accuracy Judge</span>
+                  <span className="tab-score-pill">{recordDetail.accuracy_score?.toFixed(1)}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`agent-tab-btn ${activeAgentTab === 'hallucination' ? 'tab-active' : ''}`}
+                  onClick={() => setActiveAgentTab('hallucination')}
+                >
+                  <ShieldAlert size={14} />
+                  <span>Hallucination Agent</span>
+                  <span className="tab-score-pill">{recordDetail.hallucination_score?.toFixed(1)}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`agent-tab-btn ${activeAgentTab === 'completeness' ? 'tab-active' : ''}`}
+                  onClick={() => setActiveAgentTab('completeness')}
+                >
+                  <Scale size={14} />
+                  <span>Completeness Judge</span>
+                  <span className="tab-score-pill">{recordDetail.completeness_score?.toFixed(1)}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`agent-tab-btn tab-btn-overview ${activeAgentTab === 'all' ? 'tab-active' : ''}`}
+                  onClick={() => setActiveAgentTab('all')}
+                >
+                  <Layers size={14} />
+                  <span>All 4 Overview</span>
+                </button>
+              </div>
+
+              {/* Tab 1: Relevance Judge (Full Width) */}
+              {activeAgentTab === 'relevance' && (
+                <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.relevance_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-name-group">
-                      <FileCheck size={16} />
+                      <FileCheck size={18} />
                       <h4>Relevance Judge</h4>
                     </div>
-                    <span className="agent-score-pill">
-                      {recordDetail.relevance_score?.toFixed(1)} / 5.0
-                    </span>
+                    <div className="agent-badge-group">
+                      {recordDetail.relevance_details?.relevance_category && (
+                        <span className="agent-sub-pill">
+                          {recordDetail.relevance_details.relevance_category}
+                        </span>
+                      )}
+                      <span className="agent-score-pill">
+                        {recordDetail.relevance_score?.toFixed(1)} / 5.0
+                      </span>
+                    </div>
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -216,12 +276,43 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     />
                   </div>
                   <p className="agent-reasoning">{recordDetail.relevance_reasoning}</p>
-                </div>
 
-                <div className={`agent-card ${getScoreColorClass(recordDetail.accuracy_score)}`}>
+                  {recordDetail.relevance_details?.key_alignment_points && recordDetail.relevance_details.key_alignment_points.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Direct Question Alignments:</span>
+                      <ul className="agent-sub-list">
+                        {recordDetail.relevance_details.key_alignment_points.map((pt, i) => (
+                          <li key={i} className="agent-sub-item item-align">
+                            <span className="sub-bullet">✓</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {recordDetail.relevance_details?.missed_aspects && recordDetail.relevance_details.missed_aspects.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Missed Query Nuances:</span>
+                      <ul className="agent-sub-list">
+                        {recordDetail.relevance_details.missed_aspects.map((pt, i) => (
+                          <li key={i} className="agent-sub-item item-missed">
+                            <span className="sub-bullet">⚠</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2: Accuracy Judge (Full Width) */}
+              {activeAgentTab === 'accuracy' && (
+                <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.accuracy_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-name-group">
-                      <ShieldCheck size={16} />
+                      <ShieldCheck size={18} />
                       <h4>Accuracy Judge</h4>
                     </div>
                     <span className="agent-score-pill">
@@ -235,17 +326,53 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     />
                   </div>
                   <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
-                </div>
 
-                <div className={`agent-card ${getScoreColorClass(recordDetail.hallucination_score)}`}>
+                  {recordDetail.accuracy_details?.verified_claims && recordDetail.accuracy_details.verified_claims.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Fact-Checked Claims ({recordDetail.accuracy_details.verified_claims.length}):</span>
+                      <div className="claims-list">
+                        {recordDetail.accuracy_details.verified_claims.map((c, i) => (
+                          <div key={i} className="claim-box">
+                            <div className="claim-header">
+                              <span className={`claim-badge badge-${c.verdict?.toLowerCase()}`}>
+                                {c.verdict}
+                              </span>
+                              {c.evidence_source && c.evidence_source !== 'None' && (
+                                <span className="claim-src" title={c.evidence_source}>
+                                  Source: {c.evidence_source}
+                                </span>
+                              )}
+                            </div>
+                            <p className="claim-text">"{c.claim}"</p>
+                            {c.explanation && <p className="claim-expl">{c.explanation}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Hallucination Detection (Full Width) */}
+              {activeAgentTab === 'hallucination' && (
+                <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.hallucination_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-name-group">
-                      <AlertTriangle size={16} />
-                      <h4>Hallucination Judge</h4>
+                      <ShieldAlert size={18} />
+                      <h4>Hallucination Detection</h4>
                     </div>
-                    <span className="agent-score-pill">
-                      {recordDetail.hallucination_score?.toFixed(1)} / 5.0
-                    </span>
+                    <div className="agent-badge-group">
+                      {recordDetail.hallucination_details?.hallucination_count !== undefined && (
+                        <span className={`hal-status-tag ${recordDetail.hallucination_details.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
+                          {recordDetail.hallucination_details.hallucination_count === 0
+                            ? '0 Ungrounded'
+                            : `${recordDetail.hallucination_details.hallucination_count} Ungrounded`}
+                        </span>
+                      )}
+                      <span className="agent-score-pill">
+                        {recordDetail.hallucination_score?.toFixed(1)} / 5.0
+                      </span>
+                    </div>
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -254,12 +381,39 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     />
                   </div>
                   <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
-                </div>
 
-                <div className={`agent-card ${getScoreColorClass(recordDetail.completeness_score)}`}>
+                  {recordDetail.hallucination_details?.flagged_claims && recordDetail.hallucination_details.flagged_claims.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Claim Grounding Audit ({recordDetail.hallucination_details.flagged_claims.length}):</span>
+                      <div className="claims-list">
+                        {recordDetail.hallucination_details.flagged_claims.map((c, i) => (
+                          <div key={i} className="claim-box">
+                            <div className="claim-header">
+                              <span className={`claim-badge badge-${c.grounding_status?.toLowerCase()}`}>
+                                {c.grounding_status}
+                              </span>
+                              {c.evidence_ref && c.evidence_ref !== 'None' && (
+                                <span className="claim-src" title={c.evidence_ref}>
+                                  Evidence: {c.evidence_ref}
+                                </span>
+                              )}
+                            </div>
+                            <p className="claim-text">"{c.claim_text}"</p>
+                            {c.explanation && <p className="claim-expl">{c.explanation}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 4: Completeness Judge (Full Width) */}
+              {activeAgentTab === 'completeness' && (
+                <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.completeness_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-name-group">
-                      <Scale size={16} />
+                      <Scale size={18} />
                       <h4>Completeness Judge</h4>
                     </div>
                     <span className="agent-score-pill">
@@ -274,7 +428,110 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                   </div>
                   <p className="agent-reasoning">{recordDetail.completeness_reasoning}</p>
                 </div>
-              </div>
+              )}
+
+              {/* Tab 5: All 4 Overview (2x2 Grid) */}
+              {activeAgentTab === 'all' && (
+                <div className="agent-grid-2col">
+                  {/* Left Column */}
+                  <div className="agent-col-stack">
+                    <div className={`agent-card ${getScoreColorClass(recordDetail.relevance_score)}`}>
+                      <div className="agent-card-header">
+                        <div className="agent-name-group">
+                          <FileCheck size={16} />
+                          <h4>Relevance Judge</h4>
+                        </div>
+                        <div className="agent-badge-group">
+                          {recordDetail.relevance_details?.relevance_category && (
+                            <span className="agent-sub-pill">
+                              {recordDetail.relevance_details.relevance_category}
+                            </span>
+                          )}
+                          <span className="agent-score-pill">
+                            {recordDetail.relevance_score?.toFixed(1)} / 5.0
+                          </span>
+                        </div>
+                      </div>
+                      <div className="score-bar-bg">
+                        <div
+                          className="score-bar-fill"
+                          style={{ width: `${(recordDetail.relevance_score / 5) * 100}%` }}
+                        />
+                      </div>
+                      <p className="agent-reasoning">{recordDetail.relevance_reasoning}</p>
+                    </div>
+
+                    <div className={`agent-card ${getScoreColorClass(recordDetail.accuracy_score)}`}>
+                      <div className="agent-card-header">
+                        <div className="agent-name-group">
+                          <ShieldCheck size={16} />
+                          <h4>Accuracy Judge</h4>
+                        </div>
+                        <span className="agent-score-pill">
+                          {recordDetail.accuracy_score?.toFixed(1)} / 5.0
+                        </span>
+                      </div>
+                      <div className="score-bar-bg">
+                        <div
+                          className="score-bar-fill"
+                          style={{ width: `${(recordDetail.accuracy_score / 5) * 100}%` }}
+                        />
+                      </div>
+                      <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
+                    </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="agent-col-stack">
+                    <div className={`agent-card ${getScoreColorClass(recordDetail.hallucination_score)}`}>
+                      <div className="agent-card-header">
+                        <div className="agent-name-group">
+                          <ShieldAlert size={16} />
+                          <h4>Hallucination Detection</h4>
+                        </div>
+                        <div className="agent-badge-group">
+                          {recordDetail.hallucination_details?.hallucination_count !== undefined && (
+                            <span className={`hal-status-tag ${recordDetail.hallucination_details.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
+                              {recordDetail.hallucination_details.hallucination_count === 0
+                                ? '0 Ungrounded'
+                                : `${recordDetail.hallucination_details.hallucination_count} Ungrounded`}
+                            </span>
+                          )}
+                          <span className="agent-score-pill">
+                            {recordDetail.hallucination_score?.toFixed(1)} / 5.0
+                          </span>
+                        </div>
+                      </div>
+                      <div className="score-bar-bg">
+                        <div
+                          className="score-bar-fill"
+                          style={{ width: `${(recordDetail.hallucination_score / 5) * 100}%` }}
+                        />
+                      </div>
+                      <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
+                    </div>
+
+                    <div className={`agent-card ${getScoreColorClass(recordDetail.completeness_score)}`}>
+                      <div className="agent-card-header">
+                        <div className="agent-name-group">
+                          <Scale size={16} />
+                          <h4>Completeness Judge</h4>
+                        </div>
+                        <span className="agent-score-pill">
+                          {recordDetail.completeness_score?.toFixed(1)} / 5.0
+                        </span>
+                      </div>
+                      <div className="score-bar-bg">
+                        <div
+                          className="score-bar-fill"
+                          style={{ width: `${(recordDetail.completeness_score / 5) * 100}%` }}
+                        />
+                      </div>
+                      <p className="agent-reasoning">{recordDetail.completeness_reasoning}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="column-card">

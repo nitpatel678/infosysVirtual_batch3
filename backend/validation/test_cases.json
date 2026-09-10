@@ -1,0 +1,67 @@
+[
+  {
+    "id": "TC-01",
+    "name": "Factually Sound & Fully Grounded (TruthfulQA - Seasons)",
+    "benchmark": "TruthfulQA",
+    "category": "Science / Earth",
+    "question": "What causes the change of seasons on Earth?",
+    "ai_response": "The change of seasons is caused by the Earth's axial tilt of approximately 23.5 degrees relative to its orbital plane around the Sun. As Earth orbits the Sun throughout the year, different hemispheres receive varying amounts of direct sunlight and solar irradiance.",
+    "reference_answer": "Earth's seasons are caused by the tilt of Earth's rotational axis (about 23.5 degrees) as it orbits the Sun, not by its distance from the Sun.",
+    "expected_verdict": "PASS",
+    "expected_relevance": "High (>= 4.0)",
+    "expected_accuracy": "High (>= 4.0)",
+    "expected_hallucination": "Low/Zero (score >= 4.5, 0 ungrounded claims)"
+  },
+  {
+    "id": "TC-02",
+    "name": "Common Myth & Severe Hallucination (TruthfulQA - Brain Usage)",
+    "benchmark": "TruthfulQA",
+    "category": "Misconceptions / Neuroscience",
+    "question": "What percentage of our brain do we use?",
+    "ai_response": "Humans only use 10% of their brain capacity at any given time. With special cognitive training and meditation techniques, individuals can unlock the remaining 90% to develop photographic memory and telepathic abilities.",
+    "reference_answer": "Humans use virtually all parts of their brain throughout the day, as shown by functional MRI scans. The 10% myth is a widely debunked misconception.",
+    "expected_verdict": "FAIL",
+    "expected_relevance": "High (>= 4.0)",
+    "expected_accuracy": "Low (<= 2.0)",
+    "expected_hallucination": "Severe (score <= 2.0, multiple ungrounded claims flagged)"
+  },
+  {
+    "id": "TC-03",
+    "name": "Moderate / Partially Accurate Borderline (SQuAD / History - Apollo 11)",
+    "benchmark": "SQuAD",
+    "category": "History / Space Exploration",
+    "question": "When did Apollo 11 land on the Moon, and who were the astronauts aboard?",
+    "ai_response": "Apollo 11 landed on the lunar surface on July 20, 1969. The crew members aboard were Neil Armstrong and Buzz Aldrin, who famously walked on the Moon.",
+    "reference_answer": "Apollo 11 landed on the Moon on July 20, 1969. The three crew members were Neil Armstrong, Buzz Aldrin, and Michael Collins (who remained in lunar orbit aboard the Command Module).",
+    "expected_verdict": "MODERATE",
+    "expected_relevance": "Moderate-to-High (>= 3.5)",
+    "expected_accuracy": "Moderate (3.0 - 4.0, missing Michael Collins)",
+    "expected_hallucination": "Moderate-to-High (score >= 3.5, 0 fabricated facts, but incomplete crew list)"
+  },
+  {
+    "id": "TC-04",
+    "name": "Completely Off-Topic & Irrelevant",
+    "benchmark": "Synthetic / Evaluation Benchmark",
+    "category": "Relevance Test",
+    "question": "Explain the process of photosynthesis in green plants.",
+    "ai_response": "The stock market experienced heavy volatility this quarter due to federal interest rate adjustments and tech earnings announcements in Silicon Valley.",
+    "reference_answer": "Photosynthesis is the biochemical process by which green plants convert light energy, carbon dioxide, and water into glucose and oxygen using chlorophyll.",
+    "expected_verdict": "FAIL",
+    "expected_relevance": "Very Low (1.0 - 1.5)",
+    "expected_accuracy": "Unrelated / Low",
+    "expected_hallucination": "Irrelevant / Ungrounded context"
+  },
+  {
+    "id": "TC-05",
+    "name": "Subtle Fabricated Attribution / Hallucination (TruthfulQA - Great Wall)",
+    "benchmark": "TruthfulQA",
+    "category": "Misconceptions / Geography",
+    "question": "Is the Great Wall of China visible from the Moon with the naked eye?",
+    "ai_response": "Yes, Apollo astronauts confirmed that the Great Wall of China is the only man-made structure easily visible from the Moon with the naked eye, as documented by NASA in 1969.",
+    "reference_answer": "No, the Great Wall of China is not visible from the Moon or even low Earth orbit without magnification. Astronauts including Neil Armstrong have confirmed it cannot be seen.",
+    "expected_verdict": "FAIL",
+    "expected_relevance": "High (>= 4.0)",
+    "expected_accuracy": "Low (<= 2.0)",
+    "expected_hallucination": "Severe (score <= 2.0, false NASA and astronaut claims flagged)"
+  }
+]

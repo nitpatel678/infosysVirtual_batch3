@@ -111,21 +111,40 @@ async def evaluate(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Evaluation agent error: {str(e)}")
 
-    rel_score = float(eval_result.get("relevance", {}).get("score", 3.0))
-    rel_reason = str(eval_result.get("relevance", {}).get("reasoning", ""))
+    rel_data = eval_result.get("relevance", {})
+    rel_score = float(rel_data.get("score", 3.0))
+    rel_reason = str(rel_data.get("reasoning", ""))
 
-    acc_score = float(eval_result.get("accuracy", {}).get("score", 3.0))
-    acc_reason = str(eval_result.get("accuracy", {}).get("reasoning", ""))
+    acc_data = eval_result.get("accuracy", {})
+    acc_score = float(acc_data.get("score", 3.0))
+    acc_reason = str(acc_data.get("reasoning", ""))
 
-    hal_score = float(eval_result.get("hallucination", {}).get("score", 3.0))
-    hal_reason = str(eval_result.get("hallucination", {}).get("reasoning", ""))
+    hal_data = eval_result.get("hallucination", {})
+    hal_score = float(hal_data.get("score", 3.0))
+    hal_reason = str(hal_data.get("reasoning", ""))
 
-    comp_score = float(eval_result.get("completeness", {}).get("score", 3.0))
-    comp_reason = str(eval_result.get("completeness", {}).get("reasoning", ""))
+    comp_data = eval_result.get("completeness", {})
+    comp_score = float(comp_data.get("score", 3.0))
+    comp_reason = str(comp_data.get("reasoning", ""))
 
     composite = float(eval_result.get("composite_score", round((0.25*rel_score) + (0.35*acc_score) + (0.25*hal_score) + (0.15*comp_score), 2)))
     final_verdict = str(eval_result.get("final_verdict", "PASS" if composite >= 3.5 and hal_score >= 3.0 else "FAIL"))
     verdict_summary = str(eval_result.get("verdict_summary", ""))
+
+    relevance_details = {
+        "relevance_category": rel_data.get("relevance_category", "Partially Relevant"),
+        "key_alignment_points": rel_data.get("key_alignment_points", []),
+        "missed_aspects": rel_data.get("missed_aspects", []),
+    }
+    accuracy_details = {
+        "verified_claims": acc_data.get("verified_claims", []),
+        "evidence_citations": acc_data.get("evidence_citations", []),
+    }
+    hallucination_details = {
+        "hallucination_detected": hal_data.get("hallucination_detected", False),
+        "hallucination_count": hal_data.get("hallucination_count", 0),
+        "flagged_claims": hal_data.get("flagged_claims", []),
+    }
 
     saved_record = None
     try:
@@ -147,6 +166,9 @@ async def evaluate(
             final_verdict=final_verdict,
             verdict_summary=verdict_summary,
             retrieved_evidence=retrieved_evidence,
+            relevance_details=relevance_details,
+            accuracy_details=accuracy_details,
+            hallucination_details=hallucination_details,
         )
     except Exception as e:
         print(f"Warning: Failed to save to database: {e}")
@@ -162,9 +184,21 @@ async def evaluate(
         },
         "retrieved_evidence": retrieved_evidence,
         "scores": {
-            "relevance": {"score": rel_score, "reasoning": rel_reason},
-            "accuracy": {"score": acc_score, "reasoning": acc_reason},
-            "hallucination": {"score": hal_score, "reasoning": hal_reason},
+            "relevance": {
+                "score": rel_score,
+                "reasoning": rel_reason,
+                **relevance_details,
+            },
+            "accuracy": {
+                "score": acc_score,
+                "reasoning": acc_reason,
+                **accuracy_details,
+            },
+            "hallucination": {
+                "score": hal_score,
+                "reasoning": hal_reason,
+                **hallucination_details,
+            },
             "completeness": {"score": comp_score, "reasoning": comp_reason},
             "composite": composite,
         },
@@ -173,6 +207,7 @@ async def evaluate(
             "summary": verdict_summary,
         },
     }
+
 
 
 @app.get("/api/history")
