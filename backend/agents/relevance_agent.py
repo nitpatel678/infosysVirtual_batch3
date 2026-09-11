@@ -39,7 +39,32 @@ Return ONLY a JSON object strictly matching this schema:
     raw_score = float(result.get("score", 3.0))
     score = round(min(5.0, max(1.0, raw_score)), 1)
     reasoning = str(result.get("reasoning", "Relevance assessed based on query intent."))
-    category = str(result.get("relevance_category", "Partially Relevant"))
+    
+    raw_category = str(result.get("relevance_category", "")).strip()
+    valid_categories = [
+        "Fully Relevant",
+        "Mostly Relevant",
+        "Partially Relevant",
+        "Poor Relevance",
+        "Irrelevant / Off-Topic",
+    ]
+    matched_category = None
+    for vc in valid_categories:
+        if vc.lower() in raw_category.lower():
+            matched_category = vc
+            break
+    if not matched_category:
+        if score >= 4.5:
+            matched_category = "Fully Relevant"
+        elif score >= 3.5:
+            matched_category = "Mostly Relevant"
+        elif score >= 2.5:
+            matched_category = "Partially Relevant"
+        elif score >= 1.8:
+            matched_category = "Poor Relevance"
+        else:
+            matched_category = "Irrelevant / Off-Topic"
+
     key_points = result.get("key_alignment_points", [])
     if not isinstance(key_points, list):
         key_points = [str(key_points)]
@@ -50,7 +75,7 @@ Return ONLY a JSON object strictly matching this schema:
     return {
         "score": score,
         "reasoning": reasoning,
-        "relevance_category": category,
+        "relevance_category": matched_category,
         "key_alignment_points": [str(p) for p in key_points if p],
         "missed_aspects": [str(m) for m in missed if m],
     }

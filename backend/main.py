@@ -137,12 +137,17 @@ async def evaluate(
         "missed_aspects": rel_data.get("missed_aspects", []),
     }
     accuracy_details = {
+        "accuracy_category": acc_data.get("accuracy_category", "Partially Correct"),
+        "contradiction_detected": acc_data.get("contradiction_detected", False),
+        "is_insufficient_evidence": acc_data.get("is_insufficient_evidence", False),
         "verified_claims": acc_data.get("verified_claims", []),
         "evidence_citations": acc_data.get("evidence_citations", []),
     }
     hallucination_details = {
+        "hallucination_level": hal_data.get("hallucination_level", "Moderate Hallucination"),
         "hallucination_detected": hal_data.get("hallucination_detected", False),
         "hallucination_count": hal_data.get("hallucination_count", 0),
+        "is_insufficient_evidence": hal_data.get("is_insufficient_evidence", False),
         "flagged_claims": hal_data.get("flagged_claims", []),
     }
 

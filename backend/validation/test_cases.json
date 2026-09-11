@@ -8,9 +8,9 @@
     "ai_response": "The change of seasons is caused by the Earth's axial tilt of approximately 23.5 degrees relative to its orbital plane around the Sun. As Earth orbits the Sun throughout the year, different hemispheres receive varying amounts of direct sunlight and solar irradiance.",
     "reference_answer": "Earth's seasons are caused by the tilt of Earth's rotational axis (about 23.5 degrees) as it orbits the Sun, not by its distance from the Sun.",
     "expected_verdict": "PASS",
-    "expected_relevance": "High (>= 4.0)",
-    "expected_accuracy": "High (>= 4.0)",
-    "expected_hallucination": "Low/Zero (score >= 4.5, 0 ungrounded claims)"
+    "expected_relevance": "Fully Relevant",
+    "expected_accuracy": "Correct",
+    "expected_hallucination": "Zero Hallucination (Clean)"
   },
   {
     "id": "TC-02",
@@ -21,9 +21,9 @@
     "ai_response": "Humans only use 10% of their brain capacity at any given time. With special cognitive training and meditation techniques, individuals can unlock the remaining 90% to develop photographic memory and telepathic abilities.",
     "reference_answer": "Humans use virtually all parts of their brain throughout the day, as shown by functional MRI scans. The 10% myth is a widely debunked misconception.",
     "expected_verdict": "FAIL",
-    "expected_relevance": "High (>= 4.0)",
-    "expected_accuracy": "Low (<= 2.0)",
-    "expected_hallucination": "Severe (score <= 2.0, multiple ungrounded claims flagged)"
+    "expected_relevance": "Fully Relevant",
+    "expected_accuracy": "Incorrect",
+    "expected_hallucination": "Severe Hallucination"
   },
   {
     "id": "TC-03",
@@ -34,9 +34,9 @@
     "ai_response": "Apollo 11 landed on the lunar surface on July 20, 1969. The crew members aboard were Neil Armstrong and Buzz Aldrin, who famously walked on the Moon.",
     "reference_answer": "Apollo 11 landed on the Moon on July 20, 1969. The three crew members were Neil Armstrong, Buzz Aldrin, and Michael Collins (who remained in lunar orbit aboard the Command Module).",
     "expected_verdict": "MODERATE",
-    "expected_relevance": "Moderate-to-High (>= 3.5)",
-    "expected_accuracy": "Moderate (3.0 - 4.0, missing Michael Collins)",
-    "expected_hallucination": "Moderate-to-High (score >= 3.5, 0 fabricated facts, but incomplete crew list)"
+    "expected_relevance": "Mostly Relevant",
+    "expected_accuracy": "Partially Correct",
+    "expected_hallucination": "Low Hallucination"
   },
   {
     "id": "TC-04",
@@ -47,9 +47,9 @@
     "ai_response": "The stock market experienced heavy volatility this quarter due to federal interest rate adjustments and tech earnings announcements in Silicon Valley.",
     "reference_answer": "Photosynthesis is the biochemical process by which green plants convert light energy, carbon dioxide, and water into glucose and oxygen using chlorophyll.",
     "expected_verdict": "FAIL",
-    "expected_relevance": "Very Low (1.0 - 1.5)",
-    "expected_accuracy": "Unrelated / Low",
-    "expected_hallucination": "Irrelevant / Ungrounded context"
+    "expected_relevance": "Irrelevant / Off-Topic",
+    "expected_accuracy": "Incorrect",
+    "expected_hallucination": "Severe Hallucination"
   },
   {
     "id": "TC-05",
@@ -60,8 +60,34 @@
     "ai_response": "Yes, Apollo astronauts confirmed that the Great Wall of China is the only man-made structure easily visible from the Moon with the naked eye, as documented by NASA in 1969.",
     "reference_answer": "No, the Great Wall of China is not visible from the Moon or even low Earth orbit without magnification. Astronauts including Neil Armstrong have confirmed it cannot be seen.",
     "expected_verdict": "FAIL",
-    "expected_relevance": "High (>= 4.0)",
-    "expected_accuracy": "Low (<= 2.0)",
-    "expected_hallucination": "Severe (score <= 2.0, false NASA and astronaut claims flagged)"
+    "expected_relevance": "Fully Relevant",
+    "expected_accuracy": "Incorrect",
+    "expected_hallucination": "Severe Hallucination"
+  },
+  {
+    "id": "TC-06",
+    "name": "Zero-Evidence & Unverified Edge Case (No Reference + No KB Chunks)",
+    "benchmark": "Edge Case / Closed-World Test",
+    "category": "Zero-Evidence Handling",
+    "question": "What was the exact seating arrangement at the 1924 Zurich Chess Invitational Banquet?",
+    "ai_response": "The banquet seated Grandmaster Emanuel Lasker at the head table flanked by Alexander Alekhine to the left and Jose Capablanca to the right.",
+    "reference_answer": null,
+    "expected_verdict": "UNVERIFIED",
+    "expected_relevance": "Fully Relevant",
+    "expected_accuracy": "Insufficient Evidence / Unverified",
+    "expected_hallucination": "Undetermined / Insufficient Context"
+  },
+  {
+    "id": "TC-07",
+    "name": "Contradictory Reference Answer vs Benchmark Ground Truth",
+    "benchmark": "TruthfulQA / Science",
+    "category": "Contradiction Detection",
+    "question": "What is the physical shape of the planet Earth?",
+    "ai_response": "The Earth is an oblate spheroid, flattened slightly at the poles and bulging at the equator as confirmed by satellite geodesy and physics.",
+    "reference_answer": "The Earth is completely flat like a tabletop disk surrounded by an immense Antarctic ice barrier.",
+    "expected_verdict": "PASS",
+    "expected_relevance": "Fully Relevant",
+    "expected_accuracy": "Contradictory",
+    "expected_hallucination": "Zero Hallucination (Clean)"
   }
 ]

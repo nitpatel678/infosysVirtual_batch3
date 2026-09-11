@@ -15,8 +15,16 @@ def generate_verdict(
     comp = float(completeness_data.get("score", 3.0))
 
     composite = round((0.25 * rel) + (0.35 * acc) + (0.25 * hal) + (0.15 * comp), 2)
-    is_pass = composite >= 3.50 and hal >= 3.00 and acc >= 3.00
-    preliminary_verdict = "PASS" if is_pass else "FAIL"
+    is_insufficient = accuracy_data.get("is_insufficient_evidence", False) or hallucination_data.get("is_insufficient_evidence", False)
+    
+    if is_insufficient:
+        preliminary_verdict = "UNVERIFIED"
+    elif composite >= 3.50 and hal >= 3.00 and acc >= 3.00:
+        preliminary_verdict = "PASS"
+    elif composite >= 2.80 and hal >= 2.50:
+        preliminary_verdict = "MODERATE"
+    else:
+        preliminary_verdict = "FAIL"
 
     prompt = f"""
 You are the Verdict Agent in an AI Response Validation System.

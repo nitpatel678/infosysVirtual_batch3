@@ -3,6 +3,7 @@ import {
   Send,
   RotateCcw,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   FileUp,
   FileText,
@@ -552,9 +553,16 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     <ShieldCheck size={18} />
                     <h4>Accuracy Judge</h4>
                   </div>
-                  <span className="agent-score-pill">
-                    {results.scores.accuracy.score?.toFixed(1)} / 5.0
-                  </span>
+                  <div className="agent-badge-group">
+                    {results.scores.accuracy.accuracy_category && (
+                      <span className="agent-sub-pill">
+                        {results.scores.accuracy.accuracy_category}
+                      </span>
+                    )}
+                    <span className="agent-score-pill">
+                      {results.scores.accuracy.score?.toFixed(1)} / 5.0
+                    </span>
+                  </div>
                 </div>
                 <div className="score-bar-bg">
                   <div
@@ -562,6 +570,23 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     style={{ width: `${(results.scores.accuracy.score / 5) * 100}%` }}
                   />
                 </div>
+
+                {/* Contradiction Warning Banner */}
+                {results.scores.accuracy.contradiction_detected && (
+                  <div className="agent-notice-banner notice-contradiction">
+                    <AlertTriangle size={14} />
+                    <span><strong>Contradiction Warning:</strong> Reference ground truth directly conflicts with retrieved benchmark chunks.</span>
+                  </div>
+                )}
+
+                {/* Insufficient Evidence Notice */}
+                {results.scores.accuracy.is_insufficient_evidence && (
+                  <div className="agent-notice-banner notice-insufficient">
+                    <AlertCircle size={14} />
+                    <span><strong>Closed-World Grounding Notice:</strong> No reference answer or matching knowledge base evidence was available. Score is marked Unverified.</span>
+                  </div>
+                )}
+
                 <p className="agent-reasoning">{results.scores.accuracy.reasoning}</p>
 
                 {results.scores.accuracy.verified_claims && results.scores.accuracy.verified_claims.length > 0 && (
@@ -599,6 +624,11 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     <h4>Hallucination Detection</h4>
                   </div>
                   <div className="agent-badge-group">
+                    {results.scores.hallucination.hallucination_level && (
+                      <span className="agent-sub-pill">
+                        {results.scores.hallucination.hallucination_level}
+                      </span>
+                    )}
                     {results.scores.hallucination.hallucination_count !== undefined && (
                       <span className={`hal-status-tag ${results.scores.hallucination.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
                         {results.scores.hallucination.hallucination_count === 0
@@ -617,6 +647,15 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     style={{ width: `${(results.scores.hallucination.score / 5) * 100}%` }}
                   />
                 </div>
+
+                {/* Insufficient Evidence Notice */}
+                {results.scores.hallucination.is_insufficient_evidence && (
+                  <div className="agent-notice-banner notice-insufficient">
+                    <AlertCircle size={14} />
+                    <span><strong>Insufficient Grounding Evidence:</strong> Grounding status cannot be established without reference context.</span>
+                  </div>
+                )}
+
                 <p className="agent-reasoning">{results.scores.hallucination.reasoning}</p>
 
                 {results.scores.hallucination.flagged_claims && results.scores.hallucination.flagged_claims.length > 0 && (
@@ -704,9 +743,16 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                         <ShieldCheck size={16} />
                         <h4>Accuracy Judge</h4>
                       </div>
-                      <span className="agent-score-pill">
-                        {results.scores.accuracy.score?.toFixed(1)} / 5.0
-                      </span>
+                      <div className="agent-badge-group">
+                        {results.scores.accuracy.accuracy_category && (
+                          <span className="agent-sub-pill">
+                            {results.scores.accuracy.accuracy_category}
+                          </span>
+                        )}
+                        <span className="agent-score-pill">
+                          {results.scores.accuracy.score?.toFixed(1)} / 5.0
+                        </span>
+                      </div>
                     </div>
                     <div className="score-bar-bg">
                       <div
@@ -727,11 +773,9 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                         <h4>Hallucination Detection</h4>
                       </div>
                       <div className="agent-badge-group">
-                        {results.scores.hallucination.hallucination_count !== undefined && (
-                          <span className={`hal-status-tag ${results.scores.hallucination.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
-                            {results.scores.hallucination.hallucination_count === 0
-                              ? '0 Ungrounded'
-                              : `${results.scores.hallucination.hallucination_count} Ungrounded`}
+                        {results.scores.hallucination.hallucination_level && (
+                          <span className="agent-sub-pill">
+                            {results.scores.hallucination.hallucination_level}
                           </span>
                         )}
                         <span className="agent-score-pill">
@@ -771,11 +815,23 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
             )}
           </div>
 
-          <div className={`verdict-banner ${results.verdict.status === 'PASS' ? 'verdict-banner-pass' : 'verdict-banner-fail'}`}>
+          <div className={`verdict-banner ${
+            results.verdict.status === 'PASS'
+              ? 'verdict-banner-pass'
+              : results.verdict.status === 'UNVERIFIED'
+              ? 'verdict-banner-unverified'
+              : results.verdict.status === 'MODERATE'
+              ? 'verdict-banner-moderate'
+              : 'verdict-banner-fail'
+          }`}>
             <div className="verdict-banner-left">
               <div className="verdict-icon-wrapper">
                 {results.verdict.status === 'PASS' ? (
                   <CheckCircle2 size={26} />
+                ) : results.verdict.status === 'UNVERIFIED' ? (
+                  <AlertCircle size={26} />
+                ) : results.verdict.status === 'MODERATE' ? (
+                  <AlertTriangle size={26} />
                 ) : (
                   <XCircle size={26} />
                 )}

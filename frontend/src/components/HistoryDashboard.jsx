@@ -170,11 +170,23 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
               </div>
             </div>
 
-            <div className={`verdict-banner ${recordDetail.final_verdict === 'PASS' ? 'verdict-banner-pass' : 'verdict-banner-fail'}`}>
+            <div className={`verdict-banner ${
+              recordDetail.final_verdict === 'PASS'
+                ? 'verdict-banner-pass'
+                : recordDetail.final_verdict === 'UNVERIFIED'
+                ? 'verdict-banner-unverified'
+                : recordDetail.final_verdict === 'MODERATE'
+                ? 'verdict-banner-moderate'
+                : 'verdict-banner-fail'
+            }`}>
               <div className="verdict-banner-left">
                 <div className="verdict-icon-wrapper">
                   {recordDetail.final_verdict === 'PASS' ? (
                     <CheckCircle2 size={26} />
+                  ) : recordDetail.final_verdict === 'UNVERIFIED' ? (
+                    <AlertCircle size={26} />
+                  ) : recordDetail.final_verdict === 'MODERATE' ? (
+                    <AlertTriangle size={26} />
                   ) : (
                     <XCircle size={26} />
                   )}
@@ -315,9 +327,16 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       <ShieldCheck size={18} />
                       <h4>Accuracy Judge</h4>
                     </div>
-                    <span className="agent-score-pill">
-                      {recordDetail.accuracy_score?.toFixed(1)} / 5.0
-                    </span>
+                    <div className="agent-badge-group">
+                      {recordDetail.accuracy_details?.accuracy_category && (
+                        <span className="agent-sub-pill">
+                          {recordDetail.accuracy_details.accuracy_category}
+                        </span>
+                      )}
+                      <span className="agent-score-pill">
+                        {recordDetail.accuracy_score?.toFixed(1)} / 5.0
+                      </span>
+                    </div>
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -325,6 +344,23 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       style={{ width: `${(recordDetail.accuracy_score / 5) * 100}%` }}
                     />
                   </div>
+
+                  {/* Contradiction Warning Banner */}
+                  {recordDetail.accuracy_details?.contradiction_detected && (
+                    <div className="agent-notice-banner notice-contradiction">
+                      <AlertTriangle size={14} />
+                      <span><strong>Contradiction Warning:</strong> Reference ground truth directly conflicts with retrieved benchmark chunks.</span>
+                    </div>
+                  )}
+
+                  {/* Insufficient Evidence Notice */}
+                  {recordDetail.accuracy_details?.is_insufficient_evidence && (
+                    <div className="agent-notice-banner notice-insufficient">
+                      <AlertCircle size={14} />
+                      <span><strong>Closed-World Grounding Notice:</strong> No reference answer or matching knowledge base evidence was available. Score is marked Unverified.</span>
+                    </div>
+                  )}
+
                   <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
 
                   {recordDetail.accuracy_details?.verified_claims && recordDetail.accuracy_details.verified_claims.length > 0 && (
@@ -362,6 +398,11 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       <h4>Hallucination Detection</h4>
                     </div>
                     <div className="agent-badge-group">
+                      {recordDetail.hallucination_details?.hallucination_level && (
+                        <span className="agent-sub-pill">
+                          {recordDetail.hallucination_details.hallucination_level}
+                        </span>
+                      )}
                       {recordDetail.hallucination_details?.hallucination_count !== undefined && (
                         <span className={`hal-status-tag ${recordDetail.hallucination_details.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
                           {recordDetail.hallucination_details.hallucination_count === 0
@@ -380,6 +421,15 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       style={{ width: `${(recordDetail.hallucination_score / 5) * 100}%` }}
                     />
                   </div>
+
+                  {/* Insufficient Evidence Notice */}
+                  {recordDetail.hallucination_details?.is_insufficient_evidence && (
+                    <div className="agent-notice-banner notice-insufficient">
+                      <AlertCircle size={14} />
+                      <span><strong>Insufficient Grounding Evidence:</strong> Grounding status cannot be established without reference context.</span>
+                    </div>
+                  )}
+
                   <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
 
                   {recordDetail.hallucination_details?.flagged_claims && recordDetail.hallucination_details.flagged_claims.length > 0 && (
