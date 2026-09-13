@@ -1,19 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600&family=Montserrat:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap');
 
 :root {
-  --bg-primary: #121214;
-  --bg-secondary: #1a1a1e;
-  --bg-tertiary: #222226;
-  --border-subtle: #2d2d32;
-  --border-active: #3e3e44;
+  --bg-primary: #101014;
+  --bg-secondary: #17171d;
+  --bg-tertiary: #202028;
+  --border-subtle: #334155;
+  --border-active: #64748b;
   
-  --text-primary: #f0f0f2;
-  --text-secondary: #a0a0a6;
-  --text-tertiary: #707076;
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
   
   --font-heading: 'Outfit', -apple-system, sans-serif;
   --font-body: 'Poppins', -apple-system, sans-serif;
 }
+
 
 * {
   box-sizing: border-box;

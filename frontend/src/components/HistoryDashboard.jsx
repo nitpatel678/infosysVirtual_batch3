@@ -394,8 +394,8 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.hallucination_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-name-group">
-                      <ShieldAlert size={18} />
-                      <h4>Hallucination Detection</h4>
+                      <ShieldAlert size={20} />
+                      <h4>Hallucination Detection Agent</h4>
                     </div>
                     <div className="agent-badge-group">
                       {recordDetail.hallucination_details?.hallucination_level && (
@@ -403,13 +403,11 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                           {recordDetail.hallucination_details.hallucination_level}
                         </span>
                       )}
-                      {recordDetail.hallucination_details?.hallucination_count !== undefined && (
-                        <span className={`hal-status-tag ${recordDetail.hallucination_details.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
-                          {recordDetail.hallucination_details.hallucination_count === 0
-                            ? '0 Ungrounded'
-                            : `${recordDetail.hallucination_details.hallucination_count} Ungrounded`}
-                        </span>
-                      )}
+                      <span className={`hal-status-tag ${(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
+                        {(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0)
+                          ? '✓ 0 Flagged Statements'
+                          : `⚠️ ${recordDetail.hallucination_details.hallucination_count} Statement(s) Flagged`}
+                      </span>
                       <span className="agent-score-pill">
                         {recordDetail.hallucination_score?.toFixed(1)} / 5.0
                       </span>
@@ -425,33 +423,47 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                   {/* Insufficient Evidence Notice */}
                   {recordDetail.hallucination_details?.is_insufficient_evidence && (
                     <div className="agent-notice-banner notice-insufficient">
-                      <AlertCircle size={14} />
-                      <span><strong>Insufficient Grounding Evidence:</strong> Grounding status cannot be established without reference context.</span>
+                      <AlertCircle size={16} />
+                      <span><strong>Closed-World Evaluation Notice:</strong> Grounding status cannot be established without reference context or benchmark chunks.</span>
                     </div>
                   )}
 
                   <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
 
+                  {/* Statement-by-Statement Hallucination & Factuality Breakdown */}
                   {recordDetail.hallucination_details?.flagged_claims && recordDetail.hallucination_details.flagged_claims.length > 0 && (
                     <div className="agent-sub-section">
-                      <span className="agent-sub-title">Claim Grounding Audit ({recordDetail.hallucination_details.flagged_claims.length}):</span>
+                      <div className="flex-between">
+                        <span className="agent-sub-title">Statement-by-Statement Hallucination Audit ({recordDetail.hallucination_details.flagged_claims.length} claims):</span>
+                        <span className="section-hint-badge">Cross-referenced against RAG & Ground Truth</span>
+                      </div>
                       <div className="claims-list">
-                        {recordDetail.hallucination_details.flagged_claims.map((c, i) => (
-                          <div key={i} className="claim-box">
-                            <div className="claim-header">
-                              <span className={`claim-badge badge-${c.grounding_status?.toLowerCase()}`}>
-                                {c.grounding_status}
-                              </span>
-                              {c.evidence_ref && c.evidence_ref !== 'None' && (
-                                <span className="claim-src" title={c.evidence_ref}>
-                                  Evidence: {c.evidence_ref}
+                        {recordDetail.hallucination_details.flagged_claims.map((c, i) => {
+                          const isFlagged = c.is_flagged || ['unsupported', 'fabricated', 'contradictory', 'ungrounded'].includes(c.classification?.toLowerCase() || c.grounding_status?.toLowerCase());
+                          const badgeClass = (c.classification || c.grounding_status || '').toLowerCase().replace(/\s+/g, '-');
+                          return (
+                            <div key={i} className={`claim-box ${isFlagged ? 'claim-flagged' : ''}`}>
+                              <div className="claim-header">
+                                <span className={`claim-badge badge-${badgeClass}`}>
+                                  {c.classification || c.grounding_status}
                                 </span>
+                                {c.evidence_ref && c.evidence_ref !== 'None' ? (
+                                  <span className="claim-src" title={c.evidence_ref}>
+                                    Source: {c.evidence_ref}
+                                  </span>
+                                ) : (
+                                  <span className="claim-src">No Grounding Evidence</span>
+                                )}
+                              </div>
+                              <p className="claim-text">"{c.statement || c.claim_text}"</p>
+                              {c.explanation && (
+                                <p className="claim-expl">
+                                  <strong>Reason:</strong> {c.explanation}
+                                </p>
                               )}
                             </div>
-                            <p className="claim-text">"{c.claim_text}"</p>
-                            {c.explanation && <p className="claim-expl">{c.explanation}</p>}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -463,7 +475,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.completeness_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-name-group">
-                      <Scale size={18} />
+                      <Scale size={20} />
                       <h4>Completeness Judge</h4>
                     </div>
                     <span className="agent-score-pill">
@@ -480,108 +492,117 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 </div>
               )}
 
-              {/* Tab 5: All 4 Overview (2x2 Grid) */}
+              {/* Tab 5: All 4 Overview (2x2 Grid with Equal Alignment) */}
               {activeAgentTab === 'all' && (
                 <div className="agent-grid-2col">
-                  {/* Left Column */}
-                  <div className="agent-col-stack">
-                    <div className={`agent-card ${getScoreColorClass(recordDetail.relevance_score)}`}>
-                      <div className="agent-card-header">
-                        <div className="agent-name-group">
-                          <FileCheck size={16} />
-                          <h4>Relevance Judge</h4>
-                        </div>
-                        <div className="agent-badge-group">
-                          {recordDetail.relevance_details?.relevance_category && (
-                            <span className="agent-sub-pill">
-                              {recordDetail.relevance_details.relevance_category}
-                            </span>
-                          )}
-                          <span className="agent-score-pill">
-                            {recordDetail.relevance_score?.toFixed(1)} / 5.0
+                  {/* 1. Relevance Judge */}
+                  <div className={`agent-card ${getScoreColorClass(recordDetail.relevance_score)}`}>
+                    <div className="agent-card-header">
+                      <div className="agent-name-group">
+                        <FileCheck size={18} />
+                        <h4>Relevance Judge</h4>
+                      </div>
+                      <div className="agent-badge-group">
+                        {recordDetail.relevance_details?.relevance_category && (
+                          <span className="agent-sub-pill">
+                            {recordDetail.relevance_details.relevance_category}
                           </span>
-                        </div>
+                        )}
+                        <span className="agent-score-pill">
+                          {recordDetail.relevance_score?.toFixed(1)} / 5.0
+                        </span>
                       </div>
-                      <div className="score-bar-bg">
-                        <div
-                          className="score-bar-fill"
-                          style={{ width: `${(recordDetail.relevance_score / 5) * 100}%` }}
-                        />
-                      </div>
-                      <p className="agent-reasoning">{recordDetail.relevance_reasoning}</p>
                     </div>
+                    <div className="score-bar-bg">
+                      <div
+                        className="score-bar-fill"
+                        style={{ width: `${(recordDetail.relevance_score / 5) * 100}%` }}
+                      />
+                    </div>
+                    <p className="agent-reasoning">{recordDetail.relevance_reasoning}</p>
+                  </div>
 
-                    <div className={`agent-card ${getScoreColorClass(recordDetail.accuracy_score)}`}>
-                      <div className="agent-card-header">
-                        <div className="agent-name-group">
-                          <ShieldCheck size={16} />
-                          <h4>Accuracy Judge</h4>
-                        </div>
+                  {/* 2. Hallucination Detection */}
+                  <div className={`agent-card ${getScoreColorClass(recordDetail.hallucination_score)}`}>
+                    <div className="agent-card-header">
+                      <div className="agent-name-group">
+                        <ShieldAlert size={18} />
+                        <h4>Hallucination Detection</h4>
+                      </div>
+                      <div className="agent-badge-group">
+                        {recordDetail.hallucination_details?.hallucination_level && (
+                          <span className="agent-sub-pill">
+                            {recordDetail.hallucination_details.hallucination_level}
+                          </span>
+                        )}
+                        <span className={`hal-status-tag ${(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
+                          {(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0)
+                            ? '0 Ungrounded'
+                            : `${recordDetail.hallucination_details.hallucination_count} Flagged`}
+                        </span>
+                        <span className="agent-score-pill">
+                          {recordDetail.hallucination_score?.toFixed(1)} / 5.0
+                        </span>
+                      </div>
+                    </div>
+                    <div className="score-bar-bg">
+                      <div
+                        className="score-bar-fill"
+                        style={{ width: `${(recordDetail.hallucination_score / 5) * 100}%` }}
+                      />
+                    </div>
+                    <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
+                  </div>
+
+                  {/* 3. Accuracy Judge */}
+                  <div className={`agent-card ${getScoreColorClass(recordDetail.accuracy_score)}`}>
+                    <div className="agent-card-header">
+                      <div className="agent-name-group">
+                        <ShieldCheck size={18} />
+                        <h4>Accuracy Judge</h4>
+                      </div>
+                      <div className="agent-badge-group">
+                        {recordDetail.accuracy_details?.accuracy_category && (
+                          <span className="agent-sub-pill">
+                            {recordDetail.accuracy_details.accuracy_category}
+                          </span>
+                        )}
                         <span className="agent-score-pill">
                           {recordDetail.accuracy_score?.toFixed(1)} / 5.0
                         </span>
                       </div>
-                      <div className="score-bar-bg">
-                        <div
-                          className="score-bar-fill"
-                          style={{ width: `${(recordDetail.accuracy_score / 5) * 100}%` }}
-                        />
-                      </div>
-                      <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
                     </div>
+                    <div className="score-bar-bg">
+                      <div
+                        className="score-bar-fill"
+                        style={{ width: `${(recordDetail.accuracy_score / 5) * 100}%` }}
+                      />
+                    </div>
+                    <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
                   </div>
 
-                  {/* Right Column */}
-                  <div className="agent-col-stack">
-                    <div className={`agent-card ${getScoreColorClass(recordDetail.hallucination_score)}`}>
-                      <div className="agent-card-header">
-                        <div className="agent-name-group">
-                          <ShieldAlert size={16} />
-                          <h4>Hallucination Detection</h4>
-                        </div>
-                        <div className="agent-badge-group">
-                          {recordDetail.hallucination_details?.hallucination_count !== undefined && (
-                            <span className={`hal-status-tag ${recordDetail.hallucination_details.hallucination_count === 0 ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
-                              {recordDetail.hallucination_details.hallucination_count === 0
-                                ? '0 Ungrounded'
-                                : `${recordDetail.hallucination_details.hallucination_count} Ungrounded`}
-                            </span>
-                          )}
-                          <span className="agent-score-pill">
-                            {recordDetail.hallucination_score?.toFixed(1)} / 5.0
-                          </span>
-                        </div>
+                  {/* 4. Completeness Judge */}
+                  <div className={`agent-card ${getScoreColorClass(recordDetail.completeness_score)}`}>
+                    <div className="agent-card-header">
+                      <div className="agent-name-group">
+                        <Scale size={18} />
+                        <h4>Completeness Judge</h4>
                       </div>
-                      <div className="score-bar-bg">
-                        <div
-                          className="score-bar-fill"
-                          style={{ width: `${(recordDetail.hallucination_score / 5) * 100}%` }}
-                        />
-                      </div>
-                      <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
+                      <span className="agent-score-pill">
+                        {recordDetail.completeness_score?.toFixed(1)} / 5.0
+                      </span>
                     </div>
-
-                    <div className={`agent-card ${getScoreColorClass(recordDetail.completeness_score)}`}>
-                      <div className="agent-card-header">
-                        <div className="agent-name-group">
-                          <Scale size={16} />
-                          <h4>Completeness Judge</h4>
-                        </div>
-                        <span className="agent-score-pill">
-                          {recordDetail.completeness_score?.toFixed(1)} / 5.0
-                        </span>
-                      </div>
-                      <div className="score-bar-bg">
-                        <div
-                          className="score-bar-fill"
-                          style={{ width: `${(recordDetail.completeness_score / 5) * 100}%` }}
-                        />
-                      </div>
-                      <p className="agent-reasoning">{recordDetail.completeness_reasoning}</p>
+                    <div className="score-bar-bg">
+                      <div
+                        className="score-bar-fill"
+                        style={{ width: `${(recordDetail.completeness_score / 5) * 100}%` }}
+                      />
                     </div>
+                    <p className="agent-reasoning">{recordDetail.completeness_reasoning}</p>
                   </div>
                 </div>
               )}
+
             </div>
 
             <div className="column-card">

@@ -46,8 +46,11 @@ Return JSON:
 
         cleaned_claims = [
             {
+                "statement": str(c),
                 "claim_text": str(c),
-                "grounding_status": "Uncertain",
+                "classification": "Unsupported",
+                "grounding_status": "Unsupported",
+                "is_flagged": True,
                 "evidence_ref": "None",
                 "explanation": "Cannot verify grounding because no reference answer was provided and no benchmark knowledge base chunks match this query."
             }
@@ -57,12 +60,15 @@ Return JSON:
         return {
             "score": 3.0,
             "hallucination_level": "Undetermined / Insufficient Context",
-            "reasoning": "Cannot determine hallucination status due to absence of reference ground truth and benchmark knowledge base evidence. Claims marked as Uncertain.",
+            "reasoning": "Cannot determine hallucination status due to absence of reference ground truth and benchmark knowledge base evidence. Claims marked as Unsupported / Unverified.",
             "hallucination_detected": False,
             "hallucination_count": 0,
             "flagged_claims": cleaned_claims,
+            "flagged_statements": cleaned_claims,
+            "supported_statements": [],
             "is_insufficient_evidence": True
         }
+
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks, 1):
@@ -84,13 +90,19 @@ Return JSON:
 
     prompt = f"""
 You are the Hallucination Detection Agent in an AI Response Validation System.
-Your job is to detect ungrounded claims, fabricated facts, myths presented as truth, or hallucinations in the AI-generated response by cross-referencing against reference ground truth and RAG benchmark evidence.
+Your job is to identify claims in an AI-generated response that are unsupported, fabricated, or contradicted by available reference information and RAG benchmark evidence.
 
 CRITICAL INSTRUCTION - STRICT CLOSED-WORLD GROUNDING:
 1. Cross-reference individual claims ONLY against the provided Reference Ground Truth, Source Document, and Grounding Benchmark Chunks.
 2. DO NOT use external pre-training memory to assume claims are true.
-3. If an assertion is contradicted or unsupported by the provided context, mark it as "Ungrounded" or "Uncertain".
-4. Flag specific statements and explain clearly why each is considered unsupported or fabricated.
+3. Break the AI response down into individual factual statements/claims.
+4. Flag specific statements instead of only marking the entire response as hallucinated.
+5. Clearly identify whether each statement is:
+   - "Supported": Directly verified and corroborated by the reference or benchmark chunks.
+   - "Unsupported": Claim lacks grounding evidence in the provided context.
+   - "Fabricated": Introduces fictitious entities, made-up statistics, or validates debunked myths.
+   - "Contradictory": Directly conflicts with known facts in the reference or benchmark chunks.
+6. Provide an explicit explanation for WHY each flagged statement is considered unsupported, fabricated, or contradictory.
 
 User Query:
 {question}
@@ -107,19 +119,27 @@ Uploaded Source Document Excerpt:
 Grounding Benchmark Chunks (TruthfulQA & SQuAD):
 {evidence_text if evidence_text else "None retrieved"}
 
-Evaluation Criteria (Faithfulness & Hallucination Resistance):
-- Score 5.0 (Zero Hallucination): Every claim is strictly grounded in the provided reference ground truth or benchmark evidence.
-- Score 4.0 (Low Hallucination): Soundly grounded with minor ungrounded speculation or rhetorical phrasing that causes no factual distortion.
-- Score 3.0 (Moderate Hallucination): Contains at least one ungrounded claim or treats an unverified myth/misconception as fact.
-- Score 2.0 (High Hallucination): Contains clear fabrications, false attributions, or validates widely debunked misconceptions.
+Evaluation Criteria:
+- Score 5.0 (Zero Hallucination): Every statement is strictly supported by provided ground truth or benchmark evidence (0 flagged).
+- Score 4.0 (Low Hallucination): Soundly grounded with minor ungrounded phrasing or rhetorical speculation that causes no factual distortion.
+- Score 3.0 (Moderate Hallucination): Contains 1 clear unsupported statement or treats an unverified myth/misconception as fact.
+- Score 2.0 (High Hallucination): Contains multiple unsupported, fabricated, or contradictory statements.
 - Score 1.0 (Severe Hallucination): The response is predominantly fabricated, fictitious, or dangerously misleading.
 
+Categories:
+- "Zero Hallucination (Clean)"
+- "Low Hallucination"
+- "Moderate Hallucination"
+- "High Hallucination"
+- "Severe Hallucination"
+
 Task:
-1. Break down the AI response into key claims/statements (2 to 5 statements).
-2. For each statement, determine its grounding status: "Grounded", "Ungrounded", or "Uncertain".
-3. If ungrounded, cite which evidence chunk contradicts it or explain that no evidence supports it.
-4. Count the number of ungrounded statements.
-5. Assign a final hallucination score (1.0 to 5.0), assign hallucination_level, and write a clear reasoning paragraph.
+1. Extract 2 to 5 distinct factual statements from the AI response.
+2. For each statement, determine its classification: "Supported", "Unsupported", "Fabricated", or "Contradictory".
+3. Mark "is_flagged": true if it is "Unsupported", "Fabricated", or "Contradictory".
+4. Cite supporting or contradicting evidence chunk, or state "None".
+5. Provide a clear explanation detailing why each statement is supported or flagged.
+6. Return a comprehensive structured JSON.
 
 Return ONLY a JSON object strictly matching this schema:
 {{
@@ -130,10 +150,13 @@ Return ONLY a JSON object strictly matching this schema:
   "hallucination_count": 0,
   "flagged_claims": [
     {{
-      "claim_text": "Claim from AI response",
-      "grounding_status": "Grounded",
-      "evidence_ref": "Evidence 1 (TruthfulQA) or Reference Ground Truth",
-      "explanation": "Rationale for why it is grounded or ungrounded"
+      "statement": "Extracted sentence or claim from AI response",
+      "claim_text": "Same extracted sentence",
+      "classification": "Supported",
+      "grounding_status": "Supported",
+      "is_flagged": false,
+      "evidence_ref": "Reference Ground Truth or [Evidence 1]",
+      "explanation": "Detailed rationale explaining why it is supported, unsupported, fabricated, or contradictory"
     }}
   ]
 }}
@@ -148,24 +171,55 @@ Return ONLY a JSON object strictly matching this schema:
         raw_claims = []
 
     cleaned_claims = []
-    ungrounded_count = 0
+    flagged_statements = []
+    supported_statements = []
+
     for c in raw_claims:
         if isinstance(c, dict):
-            status = str(c.get("grounding_status", "Uncertain")).capitalize()
-            if status not in ["Grounded", "Ungrounded", "Uncertain"]:
-                status = "Uncertain"
-            if status == "Ungrounded":
-                ungrounded_count += 1
-            cleaned_claims.append({
-                "claim_text": str(c.get("claim_text", "")),
-                "grounding_status": status,
-                "evidence_ref": str(c.get("evidence_ref", "None")),
-                "explanation": str(c.get("explanation", ""))
-            })
+            stmt = str(c.get("statement") or c.get("claim_text") or "").strip()
+            if not stmt:
+                continue
 
-    hal_detected = result.get("hallucination_detected")
-    if hal_detected is None:
-        hal_detected = ungrounded_count > 0 or score < 3.5
+            # Standardize classification
+            raw_cls = str(c.get("classification") or c.get("grounding_status") or "Unsupported").strip()
+            cls_lower = raw_cls.lower()
+            if "fabricat" in cls_lower:
+                classification = "Fabricated"
+                is_flagged = True
+            elif "contradict" in cls_lower:
+                classification = "Contradictory"
+                is_flagged = True
+            elif "unsupport" in cls_lower or "unground" in cls_lower or "uncertain" in cls_lower:
+                classification = "Unsupported"
+                is_flagged = True
+            elif "support" in cls_lower or "ground" in cls_lower or "correct" in cls_lower:
+                classification = "Supported"
+                is_flagged = False
+            else:
+                classification = "Unsupported"
+                is_flagged = True
+
+            ev_ref = str(c.get("evidence_ref") or c.get("evidence_source") or "None").strip()
+            expl = str(c.get("explanation") or "").strip()
+
+            claim_obj = {
+                "statement": stmt,
+                "claim_text": stmt,
+                "classification": classification,
+                "grounding_status": classification,
+                "is_flagged": is_flagged,
+                "evidence_ref": ev_ref,
+                "explanation": expl,
+            }
+            cleaned_claims.append(claim_obj)
+
+            if is_flagged:
+                flagged_statements.append(claim_obj)
+            else:
+                supported_statements.append(claim_obj)
+
+    hal_count = len(flagged_statements)
+    hal_detected = hal_count > 0 or score < 3.8
 
     # Determine qualitative severity level
     raw_level = str(result.get("hallucination_level", "")).strip()
@@ -182,7 +236,7 @@ Return ONLY a JSON object strictly matching this schema:
             matched_level = vl
             break
     if not matched_level:
-        if score >= 4.5 and ungrounded_count == 0:
+        if score >= 4.5 and hal_count == 0:
             matched_level = "Zero Hallucination (Clean)"
         elif score >= 4.0:
             matched_level = "Low Hallucination"
@@ -198,8 +252,11 @@ Return ONLY a JSON object strictly matching this schema:
         "hallucination_level": matched_level,
         "reasoning": reasoning,
         "hallucination_detected": bool(hal_detected),
-        "hallucination_count": int(result.get("hallucination_count", ungrounded_count)),
+        "hallucination_count": hal_count,
         "flagged_claims": cleaned_claims,
+        "flagged_statements": flagged_statements,
+        "supported_statements": supported_statements,
         "is_insufficient_evidence": False
     }
+
 
