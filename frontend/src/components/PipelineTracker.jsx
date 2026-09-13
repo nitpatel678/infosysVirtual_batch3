@@ -40,11 +40,6 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
     },
   ]
 
-  // Step Mapping:
-  // step 1: Stage 1 active (RAG retrieval)
-  // step 2: Stage 1 done, Stage 2 active (ALL 4 agents simultaneously processing!)
-  // step 3: Stage 1 & 2 done, Stage 3 active (Verdict & storage saving)
-  // step 4 or 6: All stages done (100%)
   const isComplete = currentStep >= 4 || currentStep >= 6
 
   let progressPercent = 0
@@ -53,15 +48,12 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
   else if (currentStep === 3) progressPercent = 90
   else if (isComplete) progressPercent = 100
 
-  // Stage 1 (RAG Retrieval)
   const isStage1Done = currentStep > 1
   const isStage1Active = currentStep === 1
 
-  // Stage 2 (Parallel Judges) - ALL 4 ACTIVE SIMULTANEOUSLY on step 2
   const isStage2Active = currentStep === 2
   const isStage2Done = currentStep >= 3
 
-  // Stage 3 (Verdict & Storage)
   const isStage3Active = currentStep === 3
   const isStage3Done = isComplete
 
@@ -91,9 +83,7 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
         />
       </div>
 
-      {/* Spacious 3-Stage Orchestration Architecture */}
       <div className="orch-flow-container">
-        {/* STAGE 1: RAG Retrieval */}
         <div className="orch-stage-box">
           <div className="orch-stage-topbar">
             <div className="stage-left-info">
@@ -127,7 +117,6 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
           </div>
         </div>
 
-        {/* FLOW BRIDGE 1 -> 2 (DIVIDES INTO 4 PARALLEL AGENTS) */}
         <div className={`orch-flow-bridge ${isStage2Active || isStage2Done ? 'bridge-lit' : ''}`}>
           <div className="bridge-line"></div>
           <div className="bridge-pill">
@@ -138,7 +127,6 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
           <div className="bridge-line"></div>
         </div>
 
-        {/* STAGE 2: Parallel Multi-Agent Evaluation (ALL 4 PROCESS TOGETHER) */}
         <div className={`orch-stage-box ${isStage2Active ? 'stage-box-active' : isStage2Done ? 'stage-box-done' : ''}`}>
           <div className="orch-stage-topbar">
             <div className="stage-left-info">
@@ -183,7 +171,6 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
           </div>
         </div>
 
-        {/* FLOW BRIDGE 2 -> 3 (CONVERGES TO STORAGE & VERDICT) */}
         <div className={`orch-flow-bridge ${isStage3Done ? 'bridge-lit' : isStage3Active ? 'bridge-active' : ''}`}>
           <div className="bridge-line"></div>
           <div className="bridge-pill">
@@ -193,7 +180,6 @@ export default function PipelineTracker({ currentStep, activeStepMessage }) {
           <div className="bridge-line"></div>
         </div>
 
-        {/* STAGE 3: Consensus Verdict & Persistence */}
         <div className="orch-stage-box">
           <div className="orch-stage-topbar">
             <div className="stage-left-info">

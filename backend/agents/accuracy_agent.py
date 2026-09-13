@@ -8,29 +8,20 @@ def evaluate_accuracy(
     source_document_text=None,
     retrieved_evidence=None,
 ):
-    # Check if any grounding context exists
     has_reference = bool(reference_answer and reference_answer.strip())
     has_doc = bool(source_document_text and source_document_text.strip())
     
-    # Filter for meaningful retrieved chunks
     valid_chunks = []
     if retrieved_evidence:
         for ev in retrieved_evidence:
             score = ev.get("score", 0.0)
             text = ev.get("text", "").strip()
-            # Chunks must meet semantic threshold (>= 0.35) or have no score attached (e.g. direct test injection)
             if text and ("score" not in ev or ev.get("score") is None or ev.get("score", 0.0) >= 0.35):
                 valid_chunks.append(ev)
 
-
-
     has_kb_evidence = len(valid_chunks) > 0
 
-    # EDGE CASE A: Completely ungrounded context (no reference answer, no doc, no matching KB chunks)
-    # Per Project Coordinator directive: Do NOT use LLM pre-training knowledge to guess accuracy.
-    # Return "Insufficient Evidence / Unverified".
     if not has_reference and not has_doc and not has_kb_evidence:
-        # Extract 1-3 claims via simple parsing/fallback to show structured breakdown
         claims_prompt = f"""
 Extract 2 to 3 distinct factual claims made in this AI Response:
 "{ai_response}"

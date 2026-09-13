@@ -11,24 +11,15 @@ def evaluate_hallucination(
     has_reference = bool(reference_answer and reference_answer.strip())
     has_doc = bool(source_document_text and source_document_text.strip())
 
-    # Filter for meaningful retrieved chunks
     valid_chunks = []
     if retrieved_evidence:
         for ev in retrieved_evidence:
             text = ev.get("text", "").strip()
-            # Chunks must meet semantic threshold (>= 0.35) or have no score attached (e.g. direct test injection)
             if text and ("score" not in ev or ev.get("score") is None or ev.get("score", 0.0) >= 0.35):
                 valid_chunks.append(ev)
 
-
-
-
-
-
     has_kb_evidence = len(valid_chunks) > 0
 
-    # EDGE CASE A: Completely ungrounded context (no reference answer, no doc, no matching KB chunks)
-    # Per Project Coordinator directive: Do NOT guess hallucination without grounding context.
     if not has_reference and not has_doc and not has_kb_evidence:
         claims_prompt = f"""
 Extract 2 to 3 distinct factual statements from this AI Response:
@@ -180,7 +171,6 @@ Return ONLY a JSON object strictly matching this schema:
             if not stmt:
                 continue
 
-            # Standardize classification
             raw_cls = str(c.get("classification") or c.get("grounding_status") or "Unsupported").strip()
             cls_lower = raw_cls.lower()
             if "fabricat" in cls_lower:
@@ -221,7 +211,6 @@ Return ONLY a JSON object strictly matching this schema:
     hal_count = len(flagged_statements)
     hal_detected = hal_count > 0 or score < 3.8
 
-    # Determine qualitative severity level
     raw_level = str(result.get("hallucination_level", "")).strip()
     valid_levels = [
         "Zero Hallucination (Clean)",

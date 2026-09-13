@@ -56,11 +56,9 @@ def generate_with_fallback(prompt, max_retries=2):
             except Exception as e:
                 err_str = str(e)
                 last_err = e
-                # If model is 404 (deprecated), 429 (quota), or 503, immediately try the next model
                 if "404" in err_str or "not found" in err_str.lower():
                     continue
                 if "429" in err_str or "quota" in err_str.lower() or "resourceexhausted" in err_str.lower():
-                    # Move to next candidate model immediately without hanging
                     time.sleep(1.0)
                     continue
                 time.sleep(1.0)

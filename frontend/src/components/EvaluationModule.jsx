@@ -191,11 +191,9 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
     }
 
     try {
-      // 1. Stage 1: Knowledge Retrieval starts
       setPipelineStep(1)
       setStepMessage('Extracting RAG grounding chunks from benchmark knowledge base...')
 
-      // 2. After 800ms, RAG finishes -> Stage 2: ALL 4 AGENTS START SIMULTANEOUSLY IN PARALLEL
       const parallelTimer = setTimeout(() => {
         setPipelineStep(2)
         setStepMessage('All 4 Judge Agents evaluating concurrently in parallel...')
@@ -215,13 +213,11 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
       const evalData = await evalRes.json()
 
-      // 3. Backend finished -> Stage 3: All 4 agents done, now storing & synthesizing
       setPipelineStep(3)
       setStepMessage('Converging agent verdicts & saving evaluation to database...')
 
       await new Promise((r) => setTimeout(r, 650))
 
-      // 4. Complete!
       setPipelineStep(4)
       setStepMessage('Evaluation complete • Saved to database')
       setResults(evalData)
@@ -440,7 +436,6 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               <span className="section-hint-badge">Click tabs to view full agent breakdown</span>
             </div>
 
-            {/* Agent Navigation Tabs */}
             <div className="agent-tabs-nav">
               <button
                 type="button"
@@ -488,24 +483,25 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               </button>
             </div>
 
-            {/* Tab 1: Relevance Judge (Full Width) */}
             {activeAgentTab === 'relevance' && (
               <div className={`agent-card agent-card-full ${getScoreColorClass(results.scores.relevance.score)}`}>
                 <div className="agent-card-header">
-                  <div className="agent-name-group">
-                    <FileCheck size={18} />
-                    <h4>Relevance Judge</h4>
-                  </div>
-                  <div className="agent-badge-group">
-                    {results.scores.relevance.relevance_category && (
-                      <span className="agent-sub-pill">
-                        {results.scores.relevance.relevance_category}
-                      </span>
-                    )}
+                  <div className="agent-header-top">
+                    <div className="agent-name-group">
+                      <FileCheck size={16} />
+                      <h4>Relevance Judge</h4>
+                    </div>
                     <span className="agent-score-pill">
                       {results.scores.relevance.score?.toFixed(1)} / 5.0
                     </span>
                   </div>
+                  {results.scores.relevance.relevance_category && (
+                    <div className="agent-header-badges">
+                      <span className="agent-sub-pill">
+                        {results.scores.relevance.relevance_category}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="score-bar-bg">
                   <div
@@ -545,24 +541,25 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               </div>
             )}
 
-            {/* Tab 2: Accuracy Judge (Full Width) */}
             {activeAgentTab === 'accuracy' && (
               <div className={`agent-card agent-card-full ${getScoreColorClass(results.scores.accuracy.score)}`}>
                 <div className="agent-card-header">
-                  <div className="agent-name-group">
-                    <ShieldCheck size={18} />
-                    <h4>Accuracy Judge</h4>
-                  </div>
-                  <div className="agent-badge-group">
-                    {results.scores.accuracy.accuracy_category && (
-                      <span className="agent-sub-pill">
-                        {results.scores.accuracy.accuracy_category}
-                      </span>
-                    )}
+                  <div className="agent-header-top">
+                    <div className="agent-name-group">
+                      <ShieldCheck size={16} />
+                      <h4>Accuracy Judge</h4>
+                    </div>
                     <span className="agent-score-pill">
                       {results.scores.accuracy.score?.toFixed(1)} / 5.0
                     </span>
                   </div>
+                  {results.scores.accuracy.accuracy_category && (
+                    <div className="agent-header-badges">
+                      <span className="agent-sub-pill">
+                        {results.scores.accuracy.accuracy_category}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="score-bar-bg">
                   <div
@@ -571,7 +568,6 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   />
                 </div>
 
-                {/* Contradiction Warning Banner */}
                 {results.scores.accuracy.contradiction_detected && (
                   <div className="agent-notice-banner notice-contradiction">
                     <AlertTriangle size={14} />
@@ -579,7 +575,6 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   </div>
                 )}
 
-                {/* Insufficient Evidence Notice */}
                 {results.scores.accuracy.is_insufficient_evidence && (
                   <div className="agent-notice-banner notice-insufficient">
                     <AlertCircle size={14} />
@@ -615,15 +610,19 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               </div>
             )}
 
-            {/* Tab 3: Hallucination Detection (Full Width) */}
             {activeAgentTab === 'hallucination' && (
               <div className={`agent-card agent-card-full ${getScoreColorClass(results.scores.hallucination.score)}`}>
                 <div className="agent-card-header">
-                  <div className="agent-name-group">
-                    <ShieldAlert size={20} />
-                    <h4>Hallucination Detection Agent</h4>
+                  <div className="agent-header-top">
+                    <div className="agent-name-group">
+                      <ShieldAlert size={16} />
+                      <h4>Hallucination Detection Agent</h4>
+                    </div>
+                    <span className="agent-score-pill">
+                      {results.scores.hallucination.score?.toFixed(1)} / 5.0
+                    </span>
                   </div>
-                  <div className="agent-badge-group">
+                  <div className="agent-header-badges">
                     {results.scores.hallucination.hallucination_level && (
                       <span className="agent-sub-pill">
                         {results.scores.hallucination.hallucination_level}
@@ -631,11 +630,8 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     )}
                     <span className={`hal-status-tag ${(!results.scores.hallucination.hallucination_count || results.scores.hallucination.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
                       {(!results.scores.hallucination.hallucination_count || results.scores.hallucination.hallucination_count === 0)
-                        ? '✓ 0 Flagged Statements'
-                        : `⚠️ ${results.scores.hallucination.hallucination_count} Statement(s) Flagged`}
-                    </span>
-                    <span className="agent-score-pill">
-                      {results.scores.hallucination.score?.toFixed(1)} / 5.0
+                        ? '0 Flagged Statements'
+                        : `${results.scores.hallucination.hallucination_count} Statement(s) Flagged`}
                     </span>
                   </div>
                 </div>
@@ -646,17 +642,15 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   />
                 </div>
 
-                {/* Insufficient Evidence Notice */}
                 {results.scores.hallucination.is_insufficient_evidence && (
                   <div className="agent-notice-banner notice-insufficient">
-                    <AlertCircle size={16} />
+                    <AlertCircle size={15} />
                     <span><strong>Closed-World Evaluation Notice:</strong> Grounding status cannot be established because no reference answer was provided and no matching benchmark chunks were retrieved.</span>
                   </div>
                 )}
 
                 <p className="agent-reasoning">{results.scores.hallucination.reasoning}</p>
 
-                {/* Statement-by-Statement Hallucination & Factuality Breakdown */}
                 {results.scores.hallucination.flagged_claims && results.scores.hallucination.flagged_claims.length > 0 && (
                   <div className="agent-sub-section">
                     <div className="flex-between">
@@ -696,17 +690,18 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               </div>
             )}
 
-            {/* Tab 4: Completeness Judge (Full Width) */}
             {activeAgentTab === 'completeness' && (
               <div className={`agent-card agent-card-full ${getScoreColorClass(results.scores.completeness.score)}`}>
                 <div className="agent-card-header">
-                  <div className="agent-name-group">
-                    <Scale size={20} />
-                    <h4>Completeness Judge</h4>
+                  <div className="agent-header-top">
+                    <div className="agent-name-group">
+                      <Scale size={16} />
+                      <h4>Completeness Judge</h4>
+                    </div>
+                    <span className="agent-score-pill">
+                      {results.scores.completeness.score?.toFixed(1)} / 5.0
+                    </span>
                   </div>
-                  <span className="agent-score-pill">
-                    {results.scores.completeness.score?.toFixed(1)} / 5.0
-                  </span>
                 </div>
                 <div className="score-bar-bg">
                   <div
@@ -718,26 +713,26 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               </div>
             )}
 
-            {/* Tab 5: All 4 Overview (2x2 Grid with Equal Alignment) */}
             {activeAgentTab === 'all' && (
               <div className="agent-grid-2col">
-                {/* 1. Relevance Judge */}
                 <div className={`agent-card ${getScoreColorClass(results.scores.relevance.score)}`}>
                   <div className="agent-card-header">
-                    <div className="agent-name-group">
-                      <FileCheck size={18} />
-                      <h4>Relevance Judge</h4>
-                    </div>
-                    <div className="agent-badge-group">
-                      {results.scores.relevance.relevance_category && (
-                        <span className="agent-sub-pill">
-                          {results.scores.relevance.relevance_category}
-                        </span>
-                      )}
+                    <div className="agent-header-top">
+                      <div className="agent-name-group">
+                        <FileCheck size={16} />
+                        <h4>Relevance Judge</h4>
+                      </div>
                       <span className="agent-score-pill">
                         {results.scores.relevance.score?.toFixed(1)} / 5.0
                       </span>
                     </div>
+                    {results.scores.relevance.relevance_category && (
+                      <div className="agent-header-badges">
+                        <span className="agent-sub-pill">
+                          {results.scores.relevance.relevance_category}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -748,14 +743,18 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <p className="agent-reasoning">{results.scores.relevance.reasoning}</p>
                 </div>
 
-                {/* 2. Hallucination Detection */}
                 <div className={`agent-card ${getScoreColorClass(results.scores.hallucination.score)}`}>
                   <div className="agent-card-header">
-                    <div className="agent-name-group">
-                      <ShieldAlert size={18} />
-                      <h4>Hallucination Detection</h4>
+                    <div className="agent-header-top">
+                      <div className="agent-name-group">
+                        <ShieldAlert size={16} />
+                        <h4>Hallucination Detection</h4>
+                      </div>
+                      <span className="agent-score-pill">
+                        {results.scores.hallucination.score?.toFixed(1)} / 5.0
+                      </span>
                     </div>
-                    <div className="agent-badge-group">
+                    <div className="agent-header-badges">
                       {results.scores.hallucination.hallucination_level && (
                         <span className="agent-sub-pill">
                           {results.scores.hallucination.hallucination_level}
@@ -765,9 +764,6 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                         {(!results.scores.hallucination.hallucination_count || results.scores.hallucination.hallucination_count === 0)
                           ? '0 Ungrounded'
                           : `${results.scores.hallucination.hallucination_count} Flagged`}
-                      </span>
-                      <span className="agent-score-pill">
-                        {results.scores.hallucination.score?.toFixed(1)} / 5.0
                       </span>
                     </div>
                   </div>
@@ -780,23 +776,24 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <p className="agent-reasoning">{results.scores.hallucination.reasoning}</p>
                 </div>
 
-                {/* 3. Accuracy Judge */}
                 <div className={`agent-card ${getScoreColorClass(results.scores.accuracy.score)}`}>
                   <div className="agent-card-header">
-                    <div className="agent-name-group">
-                      <ShieldCheck size={18} />
-                      <h4>Accuracy Judge</h4>
-                    </div>
-                    <div className="agent-badge-group">
-                      {results.scores.accuracy.accuracy_category && (
-                        <span className="agent-sub-pill">
-                          {results.scores.accuracy.accuracy_category}
-                        </span>
-                      )}
+                    <div className="agent-header-top">
+                      <div className="agent-name-group">
+                        <ShieldCheck size={16} />
+                        <h4>Accuracy Judge</h4>
+                      </div>
                       <span className="agent-score-pill">
                         {results.scores.accuracy.score?.toFixed(1)} / 5.0
                       </span>
                     </div>
+                    {results.scores.accuracy.accuracy_category && (
+                      <div className="agent-header-badges">
+                        <span className="agent-sub-pill">
+                          {results.scores.accuracy.accuracy_category}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -807,16 +804,17 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <p className="agent-reasoning">{results.scores.accuracy.reasoning}</p>
                 </div>
 
-                {/* 4. Completeness Judge */}
                 <div className={`agent-card ${getScoreColorClass(results.scores.completeness.score)}`}>
                   <div className="agent-card-header">
-                    <div className="agent-name-group">
-                      <Scale size={18} />
-                      <h4>Completeness Judge</h4>
+                    <div className="agent-header-top">
+                      <div className="agent-name-group">
+                        <Scale size={16} />
+                        <h4>Completeness Judge</h4>
+                      </div>
+                      <span className="agent-score-pill">
+                        {results.scores.completeness.score?.toFixed(1)} / 5.0
+                      </span>
                     </div>
-                    <span className="agent-score-pill">
-                      {results.scores.completeness.score?.toFixed(1)} / 5.0
-                    </span>
                   </div>
                   <div className="score-bar-bg">
                     <div
