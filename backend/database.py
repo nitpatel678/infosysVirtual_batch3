@@ -75,7 +75,6 @@ def save_evaluation(
     accuracy_details=None,
     hallucination_details=None,
 ):
-    init_db()
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -134,7 +133,6 @@ def save_evaluation(
 
 
 def get_evaluations(limit=50):
-    init_db()
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -168,7 +166,6 @@ def get_evaluations(limit=50):
 
 
 def get_evaluation_by_id(eval_id):
-    init_db()
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

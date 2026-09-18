@@ -20,6 +20,15 @@ init_db()
 
 app = FastAPI(title="AI Response Validation System")
 
+@app.on_event("startup")
+def startup_event():
+    try:
+        from knowledge_base.retrieval import _load
+        _load()
+        print("Knowledge base retrieval model preloaded successfully.")
+    except Exception as e:
+        print(f"Preloading knowledge base note: {e}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -54,7 +63,7 @@ def api_retrieve(request: RetrieveRequest):
 
 
 @app.post("/api/evaluate")
-async def evaluate(
+def evaluate(
     question: str = Form(...),
     ai_response: str = Form(...),
     reference_answer: Optional[str] = Form(None),
@@ -80,7 +89,7 @@ async def evaluate(
 
         source_doc_name = filename
         try:
-            content = await source_document.read()
+            content = source_document.file.read()
             pdf_reader = pypdf.PdfReader(io.BytesIO(content))
             extracted_pages = []
             for page in pdf_reader.pages:

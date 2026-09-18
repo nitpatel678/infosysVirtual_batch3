@@ -2,28 +2,55 @@ import os
 import re
 import json
 import time
+import threading
+from dotenv import load_dotenv
 import google.generativeai as genai
+from google.ai import generativelanguage as glm
+from google.api_core import client_options as client_options_lib
+
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+load_dotenv(env_path)
 
 PRIMARY_MODEL = "gemini-3.6-flash"
 FALLBACK_MODELS = [
     "gemini-3.7-flash",
+    "gemini-3.5-flash",
     "gemini-3.1-flash-lite",
-    "gemini-3.5-flash-lite",
-    "gemini-3-flash-preview",
 ]
 
+_api_keys = []
+key1 = os.getenv("GEMINI_API_KEY")
+key2 = os.getenv("GEMINI_API_KEY_2")
+if key1 and key1.strip():
+    _api_keys.append(key1.strip())
+if key2 and key2.strip() and key2.strip() != key1.strip():
+    _api_keys.append(key2.strip())
 
-def configure_genai():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        from dotenv import load_dotenv
-        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-        load_dotenv(env_path)
-        api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not found in environment")
-    genai.configure(api_key=api_key.strip())
+_key_index = 0
+_pool_lock = threading.Lock()
+_client_cache = {}
+_client_cache_lock = threading.Lock()
 
+
+def get_client_for_key(key: str) -> glm.GenerativeServiceClient:
+    with _client_cache_lock:
+        if key not in _client_cache:
+            opts = client_options_lib.ClientOptions(api_key=key)
+            _client_cache[key] = glm.GenerativeServiceClient(client_options=opts)
+        return _client_cache[key]
+
+
+def get_ordered_api_keys():
+    global _key_index
+    with _pool_lock:
+        if not _api_keys:
+            raise RuntimeError("No GEMINI_API_KEY found in environment or .env file")
+        keys = list(_api_keys)
+        if len(keys) > 1:
+            idx = _key_index % len(keys)
+            _key_index += 1
+            return keys[idx:] + keys[:idx]
+        return keys
 
 
 def parse_agent_json(text):
@@ -37,32 +64,35 @@ def parse_agent_json(text):
 
 
 def generate_with_fallback(prompt, max_retries=2):
-    configure_genai()
     candidate_models = [PRIMARY_MODEL] + FALLBACK_MODELS
+    keys = get_ordered_api_keys()
     last_err = None
 
     for attempt in range(max_retries):
-        for model_name in candidate_models:
-            try:
-                model = genai.GenerativeModel(model_name)
-                response = model.generate_content(
-                    prompt,
-                    generation_config={
-                        "temperature": 0.1,
-                        "response_mime_type": "application/json",
-                    },
-                )
-                return parse_agent_json(response.text)
-            except Exception as e:
-                err_str = str(e)
-                last_err = e
-                if "404" in err_str or "not found" in err_str.lower():
+        for key in keys:
+            client = get_client_for_key(key)
+            for model_name in candidate_models:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    model._client = client
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={
+                            "temperature": 0.1,
+                            "response_mime_type": "application/json",
+                        },
+                    )
+                    return parse_agent_json(response.text)
+                except Exception as e:
+                    err_str = str(e).lower()
+                    last_err = e
+                    if "404" in err_str or "not found" in err_str:
+                        continue
+                    if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str:
+                        break
                     continue
-                if "429" in err_str or "quota" in err_str.lower() or "resourceexhausted" in err_str.lower():
-                    time.sleep(1.0)
-                    continue
-                time.sleep(1.0)
-                continue
 
-    raise RuntimeError(f"All generative models failed: {last_err}")
+        if attempt < max_retries - 1:
+            time.sleep(0.5)
 
+    raise RuntimeError(f"All generative models and API keys failed: {last_err}")
