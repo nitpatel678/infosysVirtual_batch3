@@ -89,7 +89,8 @@ def generate_with_fallback(prompt, max_retries=2):
                     if "404" in err_str or "not found" in err_str:
                         continue
                     if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str:
-                        break
+                        # Continue to next candidate model because Google Free Tier quota is per-model
+                        continue
                     continue
 
         if attempt < max_retries - 1:
