@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import Navbar from './components/Navbar'
+import Sidebar from './components/Sidebar'
 import EvaluationModule from './components/EvaluationModule'
 import BatchEvaluationModule from './components/BatchEvaluationModule'
+import AnalyticsDashboard from './components/AnalyticsDashboard'
 import HistoryDashboard from './components/HistoryDashboard'
 import './App.css'
 
@@ -23,47 +24,58 @@ function App() {
     setSelectedEvalId(null)
   }
 
+  const viewTitles = {
+    evaluate: 'Single Evaluation Studio',
+    batch: 'Batch CSV Evaluation Module',
+    analytics: 'Analytics & Insights Dashboard',
+    history: 'Evaluation History & Records',
+  }
+
   return (
-    <div className="app-layout">
-      <Navbar
+    <div className="app-shell">
+      <Sidebar
         activeView={activeView}
         setActiveView={setActiveView}
         onNavigateHome={handleNavigateHome}
       />
 
-      <main className="main-content">
-        <section className="hero-section">
-          <h1 className="hero-heading">AI Response Validator</h1>
-          <p className="hero-subheading">
-            Multi-agent evaluation platform for accuracy, hallucination detection, completeness, and factual grounding.
-          </p>
-        </section>
+      <div className="app-main-area">
+        <header className="app-topbar">
+          <div className="topbar-left">
+            <h2 className="topbar-view-title">{viewTitles[activeView] || 'AI Response Validator'}</h2>
+          </div>
+          <div className="topbar-right">
+            <span className="topbar-badge">Infosys Springboard #M-3-5</span>
+          </div>
+        </header>
 
-        {activeView === 'history' && (
-          <HistoryDashboard
-            onSelectEvaluation={handleSelectFromHistory}
-            onBackToForm={() => setActiveView('evaluate')}
-          />
-        )}
+        <main className="content-container">
+          {activeView === 'evaluate' && (
+            <EvaluationModule
+              selectedEvalId={selectedEvalId}
+              onClearSelectedEval={handleClearSelected}
+            />
+          )}
 
-        {activeView === 'batch' && (
-          <BatchEvaluationModule />
-        )}
+          {activeView === 'batch' && <BatchEvaluationModule />}
 
-        {activeView === 'evaluate' && (
-          <EvaluationModule
-            selectedEvalId={selectedEvalId}
-            onClearSelectedEval={handleClearSelected}
-          />
-        )}
-      </main>
+          {activeView === 'analytics' && <AnalyticsDashboard />}
 
-      <footer className="footer">
-        <div className="footer-container">
-          <div className="footer-title">Infosys Springboard Virtual Internship</div>
-          <div className="footer-details">Project #M-3-5 • Nitin Patel</div>
-        </div>
-      </footer>
+          {activeView === 'history' && (
+            <HistoryDashboard
+              onSelectEvaluation={handleSelectFromHistory}
+              onBackToForm={() => setActiveView('evaluate')}
+            />
+          )}
+        </main>
+
+        <footer className="footer">
+          <div className="footer-container">
+            <div className="footer-title">Infosys Springboard Virtual Internship</div>
+            <div className="footer-details">Project #M-3-5 • Nitin Patel</div>
+          </div>
+        </footer>
+      </div>
     </div>
   )
 }

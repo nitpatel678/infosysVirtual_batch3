@@ -270,3 +270,178 @@ def get_batch_records(batch_id):
             return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def get_analytics_summary():
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    id,
+                    created_at,
+                    final_verdict,
+                    composite_score,
+                    relevance_score,
+                    accuracy_score,
+                    hallucination_score,
+                    completeness_score,
+                    hallucination_details,
+                    verdict_details
+                FROM evaluation_records
+                ORDER BY created_at ASC;
+            """)
+            records = cur.fetchall()
+
+            total = len(records)
+            if total == 0:
+                return {
+                    "total": 0,
+                    "passed": 0,
+                    "needs_improvement": 0,
+                    "failed": 0,
+                    "unverified": 0,
+                    "hallucinations": 0,
+                    "conflicts": 0,
+                    "rates": {
+                        "pass_rate": 0.0,
+                        "needs_rate": 0.0,
+                        "fail_rate": 0.0,
+                        "unverified_rate": 0.0,
+                        "hallucination_rate": 0.0,
+                    },
+                    "averages": {
+                        "composite": 0.0,
+                        "relevance": 0.0,
+                        "accuracy": 0.0,
+                        "hallucination": 0.0,
+                        "completeness": 0.0,
+                    },
+                    "monthly_trends": [],
+                    "recent_trajectory": [],
+                }
+
+            passed = 0
+            needs = 0
+            failed = 0
+            unverified = 0
+            hallucinations = 0
+            conflicts = 0
+
+            sum_comp = 0.0
+            sum_rel = 0.0
+            sum_acc = 0.0
+            sum_hal = 0.0
+            sum_com = 0.0
+
+            from collections import defaultdict
+            monthly_groups = defaultdict(lambda: {"total": 0, "passed": 0, "needs": 0, "failed": 0, "unverified": 0, "sum_score": 0.0})
+
+            recent_trajectory = []
+
+            for r in records:
+                v = (r["final_verdict"] or "").lower()
+                c_score = float(r["composite_score"] or 0.0)
+                r_score = float(r["relevance_score"] or 0.0)
+                a_score = float(r["accuracy_score"] or 0.0)
+                h_score = float(r["hallucination_score"] or 0.0)
+                co_score = float(r["completeness_score"] or 0.0)
+
+                sum_comp += c_score
+                sum_rel += r_score
+                sum_acc += a_score
+                sum_hal += h_score
+                sum_com += co_score
+
+                is_pass = "pass" in v
+                is_needs = "needs" in v or "moderate" in v
+                is_unver = "unverified" in v
+
+                if is_pass:
+                    passed += 1
+                elif is_needs:
+                    needs += 1
+                elif is_unver:
+                    unverified += 1
+                else:
+                    failed += 1
+
+                hal_details = r["hallucination_details"] or {}
+                if isinstance(hal_details, str):
+                    try:
+                        hal_details = json.loads(hal_details)
+                    except Exception:
+                        hal_details = {}
+                if hal_details.get("hallucination_detected", False) or (hal_details.get("hallucination_count", 0) > 0) or h_score < 3.0:
+                    hallucinations += 1
+
+                verd_details = r["verdict_details"] or {}
+                if isinstance(verd_details, str):
+                    try:
+                        verd_details = json.loads(verd_details)
+                    except Exception:
+                        verd_details = {}
+                if verd_details.get("source_conflict_detected", False):
+                    conflicts += 1
+
+                created = r["created_at"]
+                month_key = created.strftime("%b %Y") if hasattr(created, "strftime") else "Current"
+                m_entry = monthly_groups[month_key]
+                m_entry["total"] += 1
+                m_entry["sum_score"] += c_score
+                if is_pass:
+                    m_entry["passed"] += 1
+                elif is_needs:
+                    m_entry["needs"] += 1
+                elif is_unver:
+                    m_entry["unverified"] += 1
+                else:
+                    m_entry["failed"] += 1
+
+                recent_trajectory.append({
+                    "id": r["id"],
+                    "score": round(c_score, 2),
+                    "verdict": r["final_verdict"],
+                    "date": created.strftime("%d %b") if hasattr(created, "strftime") else "",
+                })
+
+            monthly_trends = []
+            for m_key, m_data in monthly_groups.items():
+                monthly_trends.append({
+                    "month": m_key,
+                    "total": m_data["total"],
+                    "passed": m_data["passed"],
+                    "needs": m_data["needs"],
+                    "failed": m_data["failed"],
+                    "unverified": m_data["unverified"],
+                    "avg_score": round(m_data["sum_score"] / m_data["total"], 2),
+                })
+
+            return {
+                "total": total,
+                "passed": passed,
+                "needs_improvement": needs,
+                "failed": failed,
+                "unverified": unverified,
+                "hallucinations": hallucinations,
+                "conflicts": conflicts,
+                "rates": {
+                    "pass_rate": round((passed / total) * 100, 1),
+                    "needs_rate": round((needs / total) * 100, 1),
+                    "fail_rate": round((failed / total) * 100, 1),
+                    "unverified_rate": round((unverified / total) * 100, 1),
+                    "hallucination_rate": round((hallucinations / total) * 100, 1),
+                },
+                "averages": {
+                    "composite": round(sum_comp / total, 2),
+                    "relevance": round(sum_rel / total, 2),
+                    "accuracy": round(sum_acc / total, 2),
+                    "hallucination": round(sum_hal / total, 2),
+                    "completeness": round(sum_com / total, 2),
+                },
+                "monthly_trends": monthly_trends,
+                "recent_trajectory": recent_trajectory[-30:],
+            }
+    finally:
+        conn.close()
+

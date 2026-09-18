@@ -25,6 +25,7 @@ from database import (
     update_batch_progress,
     get_batch_job,
     get_batch_records,
+    get_analytics_summary,
 )
 from agents.evaluator import evaluate_response
 
@@ -668,6 +669,15 @@ def history_item(eval_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@app.get("/api/analytics")
+def analytics():
+    try:
+        data = get_analytics_summary()
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate analytics: {str(e)}")
 
 
 if __name__ == "__main__":
