@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import Navbar from './components/Navbar'
 import EvaluationModule from './components/EvaluationModule'
+import BatchEvaluationModule from './components/BatchEvaluationModule'
 import HistoryDashboard from './components/HistoryDashboard'
 import './App.css'
 
@@ -34,16 +35,22 @@ function App() {
         <section className="hero-section">
           <h1 className="hero-heading">AI Response Validator</h1>
           <p className="hero-subheading">
-            Evaluate accuracy, hallucination, and factual grounding against reference benchmarks.
+            Multi-agent evaluation platform for accuracy, hallucination detection, completeness, and factual grounding.
           </p>
         </section>
 
-        {activeView === 'history' ? (
+        {activeView === 'history' && (
           <HistoryDashboard
             onSelectEvaluation={handleSelectFromHistory}
             onBackToForm={() => setActiveView('evaluate')}
           />
-        ) : (
+        )}
+
+        {activeView === 'batch' && (
+          <BatchEvaluationModule />
+        )}
+
+        {activeView === 'evaluate' && (
           <EvaluationModule
             selectedEvalId={selectedEvalId}
             onClearSelectedEval={handleClearSelected}

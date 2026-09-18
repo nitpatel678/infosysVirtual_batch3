@@ -32,7 +32,12 @@ def orchestrate_evaluation(
             retrieved_evidence,
         )
         f_comp = executor.submit(
-            evaluate_completeness, question, ai_response, reference_answer
+            evaluate_completeness,
+            question,
+            ai_response,
+            reference_answer,
+            source_document_text,
+            retrieved_evidence,
         )
 
         rel_data = f_rel.result()
@@ -55,6 +60,8 @@ def orchestrate_evaluation(
         "hallucination": hal_data,
         "completeness": comp_data,
         "composite_score": verdict_data["composite_score"],
+        "overall_score": verdict_data["overall_score"],
         "final_verdict": verdict_data["final_verdict"],
         "verdict_summary": verdict_data["verdict_summary"],
+        "verdict": verdict_data,
     }

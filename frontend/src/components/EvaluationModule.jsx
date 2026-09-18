@@ -125,12 +125,17 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               reasoning: rec.hallucination_reasoning,
               ...(rec.hallucination_details || {}),
             },
-            completeness: { score: rec.completeness_score, reasoning: rec.completeness_reasoning },
+            completeness: {
+              score: rec.completeness_score,
+              reasoning: rec.completeness_reasoning,
+              ...(rec.completeness_details || {}),
+            },
             composite: rec.composite_score,
           },
           verdict: {
             status: rec.final_verdict,
             summary: rec.verdict_summary,
+            ...(rec.verdict_details || {}),
           },
         })
         setPipelineStep(4)
@@ -702,6 +707,18 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                       {results.scores.completeness.score?.toFixed(1)} / 5.0
                     </span>
                   </div>
+                  <div className="agent-header-badges">
+                    {results.scores.completeness.completeness_category && (
+                      <span className="agent-sub-pill">
+                        {results.scores.completeness.completeness_category}
+                      </span>
+                    )}
+                    {results.scores.completeness.source_conflict_detected && (
+                      <span className="conflict-tag-pill" title="Discrepancy detected between Reference Ground Truth and Benchmark Knowledge Base">
+                        Conflict in Ground Truth
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="score-bar-bg">
                   <div
@@ -710,6 +727,48 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   />
                 </div>
                 <p className="agent-reasoning">{results.scores.completeness.reasoning}</p>
+
+                {results.scores.completeness.identified_requirements && results.scores.completeness.identified_requirements.length > 0 && (
+                  <div className="agent-sub-section">
+                    <span className="agent-sub-title">Identified Question Requirements:</span>
+                    <ul className="agent-sub-list">
+                      {results.scores.completeness.identified_requirements.map((req, i) => (
+                        <li key={i} className="agent-sub-item item-req">
+                          <span className="sub-bullet">•</span>
+                          <span>{req}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {results.scores.completeness.addressed_aspects && results.scores.completeness.addressed_aspects.length > 0 && (
+                  <div className="agent-sub-section">
+                    <span className="agent-sub-title">Addressed Aspects:</span>
+                    <ul className="agent-sub-list">
+                      {results.scores.completeness.addressed_aspects.map((pt, i) => (
+                        <li key={i} className="agent-sub-item item-align">
+                          <span className="sub-bullet">✓</span>
+                          <span>{pt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {results.scores.completeness.missing_aspects && results.scores.completeness.missing_aspects.length > 0 && (
+                  <div className="agent-sub-section">
+                    <span className="agent-sub-title">Missing / Omitted Aspects:</span>
+                    <ul className="agent-sub-list">
+                      {results.scores.completeness.missing_aspects.map((pt, i) => (
+                        <li key={i} className="agent-sub-item item-missed">
+                          <span className="sub-bullet">⚠</span>
+                          <span>{pt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
@@ -830,22 +889,22 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
 
           <div className={`verdict-banner ${
-            results.verdict.status === 'PASS'
+            (results.verdict.status || '').toLowerCase().includes('pass')
               ? 'verdict-banner-pass'
-              : results.verdict.status === 'UNVERIFIED'
-              ? 'verdict-banner-unverified'
-              : results.verdict.status === 'MODERATE'
+              : (results.verdict.status || '').toLowerCase().includes('needs')
               ? 'verdict-banner-moderate'
+              : (results.verdict.status || '').toLowerCase().includes('unverified')
+              ? 'verdict-banner-unverified'
               : 'verdict-banner-fail'
           }`}>
             <div className="verdict-banner-left">
               <div className="verdict-icon-wrapper">
-                {results.verdict.status === 'PASS' ? (
+                {(results.verdict.status || '').toLowerCase().includes('pass') ? (
                   <CheckCircle2 size={26} />
-                ) : results.verdict.status === 'UNVERIFIED' ? (
-                  <AlertCircle size={26} />
-                ) : results.verdict.status === 'MODERATE' ? (
+                ) : (results.verdict.status || '').toLowerCase().includes('needs') ? (
                   <AlertTriangle size={26} />
+                ) : (results.verdict.status || '').toLowerCase().includes('unverified') ? (
+                  <AlertCircle size={26} />
                 ) : (
                   <XCircle size={26} />
                 )}
@@ -855,13 +914,39 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <span className="verdict-status-title">
                     FINAL VERDICT: {results.verdict.status}
                   </span>
+                  {results.verdict.source_conflict_detected && (
+                    <span className="conflict-tag-pill" title="Discrepancy detected between Reference Answer and RAG evidence">
+                      Conflict in Ground Truth
+                    </span>
+                  )}
+                  <span className="formula-tag-pill">
+                    Weights: 25% Rel • 35% Acc • 25% Hal • 15% Comp
+                  </span>
                 </div>
-                <p className="verdict-summary-text">{results.verdict.summary}</p>
+                <p className="verdict-summary-text">{results.verdict.summary || results.verdict.verdict_summary}</p>
+
+                {results.verdict.major_issues && results.verdict.major_issues.length > 0 && (
+                  <div className="verdict-issues-row">
+                    <span className="issues-label">Key Issues:</span>
+                    {results.verdict.major_issues.map((iss, i) => (
+                      <span key={i} className="issue-pill">⚠ {iss}</span>
+                    ))}
+                  </div>
+                )}
+
+                {results.verdict.strengths && results.verdict.strengths.length > 0 && (
+                  <div className="verdict-issues-row">
+                    <span className="issues-label">Strengths:</span>
+                    {results.verdict.strengths.map((str, i) => (
+                      <span key={i} className="strength-pill">✓ {str}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="verdict-banner-score">
-              <span className="composite-label">Overall Composite</span>
+              <span className="composite-label">Weighted Overall</span>
               <span className="composite-number">{results.scores.composite?.toFixed(2)}</span>
               <span className="composite-max">/ 5.00</span>
             </div>

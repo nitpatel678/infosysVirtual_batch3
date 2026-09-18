@@ -1,5 +1,5 @@
 import React from 'react'
-import { Clock, PlusCircle } from 'lucide-react'
+import { Clock, CheckSquare, FileSpreadsheet } from 'lucide-react'
 
 export default function Navbar({ activeView, setActiveView, onNavigateHome }) {
   return (
@@ -8,11 +8,8 @@ export default function Navbar({ activeView, setActiveView, onNavigateHome }) {
         <div
           className="navbar-brand clickable-brand"
           onClick={() => {
-            if (onNavigateHome) {
-              onNavigateHome()
-            } else {
-              setActiveView('evaluate')
-            }
+            if (onNavigateHome) onNavigateHome()
+            else setActiveView('evaluate')
           }}
           role="button"
           tabIndex={0}
@@ -28,25 +25,32 @@ export default function Navbar({ activeView, setActiveView, onNavigateHome }) {
         </div>
 
         <div className="navbar-actions">
-          {activeView === 'evaluate' ? (
-            <button
-              type="button"
-              className="nav-history-btn"
-              onClick={() => setActiveView('history')}
-            >
-              <Clock size={14} />
-              <span>Evaluation Records</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="nav-history-btn nav-new-btn"
-              onClick={() => setActiveView('evaluate')}
-            >
-              <PlusCircle size={14} />
-              <span>New Evaluation</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className={`nav-tab-link ${activeView === 'evaluate' ? 'nav-active' : ''}`}
+            onClick={() => setActiveView('evaluate')}
+          >
+            <CheckSquare size={14} />
+            <span>Single Evaluation</span>
+          </button>
+
+          <button
+            type="button"
+            className={`nav-tab-link ${activeView === 'batch' ? 'nav-active' : ''}`}
+            onClick={() => setActiveView('batch')}
+          >
+            <FileSpreadsheet size={14} />
+            <span>Batch Evaluation (CSV)</span>
+          </button>
+
+          <button
+            type="button"
+            className={`nav-tab-link ${activeView === 'history' ? 'nav-active' : ''}`}
+            onClick={() => setActiveView('history')}
+          >
+            <Clock size={14} />
+            <span>Evaluation Records</span>
+          </button>
         </div>
       </div>
     </header>
