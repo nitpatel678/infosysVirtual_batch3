@@ -35,6 +35,12 @@ function getScorePillClass(score) {
   return 'score-pill-low'
 }
 
+function getScoreColorClass(score) {
+  if (score >= 4.0) return 'agent-good'
+  if (score >= 3.0) return 'agent-moderate'
+  return 'agent-poor'
+}
+
 export default function BatchEvaluationModule() {
   const [csvFile, setCsvFile] = useState(null)
   const [parsedPreview, setParsedPreview] = useState([])
@@ -405,6 +411,15 @@ export default function BatchEvaluationModule() {
 
       {batchData && (
         <div className="batch-results-view">
+          {batchData.rate_limit_notice && (
+            <div className="batch-rate-limit-banner">
+              <AlertTriangle size={18} className="banner-icon-amber" />
+              <div>
+                <strong className="banner-title">Batch Finalized Early: API Quota / Rate Limit Reached</strong>
+                <p className="banner-desc">{batchData.rate_limit_notice}</p>
+              </div>
+            </div>
+          )}
           <div className="batch-stats-grid">
             <div className="stat-card">
               <span className="stat-label">Total Evaluated</span>
@@ -750,7 +765,7 @@ export default function BatchEvaluationModule() {
               </div>
 
               <div className="agent-grid-2col modal-grid">
-                <div className="agent-card">
+                <div className={`agent-card ${getScoreColorClass(selectedRecord.relevance_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-header-top">
                       <div className="agent-name-group">
@@ -759,11 +774,42 @@ export default function BatchEvaluationModule() {
                       </div>
                       <span className="agent-score-pill">{selectedRecord.relevance_score?.toFixed(1)} / 5.0</span>
                     </div>
+                    {selectedRecord.relevance_details?.relevance_category && (
+                      <span className="agent-sub-pill">{selectedRecord.relevance_details.relevance_category}</span>
+                    )}
                   </div>
                   <p className="agent-reasoning">{selectedRecord.relevance_reasoning}</p>
+
+                  {selectedRecord.relevance_details?.key_alignment_points && selectedRecord.relevance_details.key_alignment_points.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Key Alignment Points:</span>
+                      <ul className="agent-sub-list">
+                        {selectedRecord.relevance_details.key_alignment_points.map((pt, i) => (
+                          <li key={i} className="agent-sub-item item-align">
+                            <span className="sub-bullet">✓</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selectedRecord.relevance_details?.missed_aspects && selectedRecord.relevance_details.missed_aspects.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Missed / Ignored Aspects:</span>
+                      <ul className="agent-sub-list">
+                        {selectedRecord.relevance_details.missed_aspects.map((pt, i) => (
+                          <li key={i} className="agent-sub-item item-missed">
+                            <span className="sub-bullet">⚠</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
-                <div className="agent-card">
+                <div className={`agent-card ${getScoreColorClass(selectedRecord.accuracy_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-header-top">
                       <div className="agent-name-group">
@@ -772,11 +818,42 @@ export default function BatchEvaluationModule() {
                       </div>
                       <span className="agent-score-pill">{selectedRecord.accuracy_score?.toFixed(1)} / 5.0</span>
                     </div>
+                    {selectedRecord.accuracy_details?.accuracy_category && (
+                      <span className="agent-sub-pill">{selectedRecord.accuracy_details.accuracy_category}</span>
+                    )}
                   </div>
                   <p className="agent-reasoning">{selectedRecord.accuracy_reasoning}</p>
+
+                  {selectedRecord.accuracy_details?.verified_claims && selectedRecord.accuracy_details.verified_claims.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Verified Claims:</span>
+                      <ul className="agent-sub-list">
+                        {selectedRecord.accuracy_details.verified_claims.map((claim, i) => (
+                          <li key={i} className="agent-sub-item item-align">
+                            <span className="sub-bullet">✓</span>
+                            <span>{claim}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selectedRecord.accuracy_details?.evidence_citations && selectedRecord.accuracy_details.evidence_citations.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Evidence Citations:</span>
+                      <ul className="agent-sub-list">
+                        {selectedRecord.accuracy_details.evidence_citations.map((cite, i) => (
+                          <li key={i} className="agent-sub-item item-citation">
+                            <span className="sub-bullet">🔗</span>
+                            <span>{cite}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
-                <div className="agent-card">
+                <div className={`agent-card ${getScoreColorClass(selectedRecord.hallucination_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-header-top">
                       <div className="agent-name-group">
@@ -785,11 +862,28 @@ export default function BatchEvaluationModule() {
                       </div>
                       <span className="agent-score-pill">{selectedRecord.hallucination_score?.toFixed(1)} / 5.0</span>
                     </div>
+                    {selectedRecord.hallucination_details?.hallucination_level && (
+                      <span className="agent-sub-pill">{selectedRecord.hallucination_details.hallucination_level}</span>
+                    )}
                   </div>
                   <p className="agent-reasoning">{selectedRecord.hallucination_reasoning}</p>
+
+                  {selectedRecord.hallucination_details?.flagged_claims && selectedRecord.hallucination_details.flagged_claims.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Flagged Hallucinations:</span>
+                      <ul className="agent-sub-list">
+                        {selectedRecord.hallucination_details.flagged_claims.map((claim, i) => (
+                          <li key={i} className="agent-sub-item item-hallucination">
+                            <span className="sub-bullet">⚠</span>
+                            <span>{claim}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
-                <div className="agent-card">
+                <div className={`agent-card ${getScoreColorClass(selectedRecord.completeness_score)}`}>
                   <div className="agent-card-header">
                     <div className="agent-header-top">
                       <div className="agent-name-group">
@@ -839,10 +933,11 @@ export default function BatchEvaluationModule() {
               <span className="modal-footer-note">Detailed multi-agent evaluation output</span>
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-secondary"
                 onClick={() => setSelectedRecord(null)}
               >
-                Close Inspection
+                <X size={14} />
+                <span>Close Inspection</span>
               </button>
             </div>
           </div>

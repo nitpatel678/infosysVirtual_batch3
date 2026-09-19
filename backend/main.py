@@ -451,7 +451,43 @@ def _run_batch_worker(batch_id: str, rows: list):
             }
 
         except Exception as e:
-            print(f"Error evaluating batch row {idx}: {e}")
+            err_str = str(e)
+            print(f"Error evaluating batch row {idx}: {err_str}")
+            err_lower = err_str.lower()
+            is_rate_limit = (
+                "429" in err_str
+                or "quota" in err_lower
+                or "resourceexhausted" in err_lower
+                or "rate limit" in err_lower
+                or "too many requests" in err_lower
+            )
+
+            if is_rate_limit:
+                processed_count = len(records)
+                print(f"Batch {batch_id}: API rate limit detected at row {idx}. Finalizing with {processed_count} evaluated rows.")
+                stats["processed"] = processed_count
+                if processed_count > 0:
+                    stats["avg_relevance"] = round(sum_rel / processed_count, 2)
+                    stats["avg_accuracy"] = round(sum_acc / processed_count, 2)
+                    stats["avg_hallucination"] = round(sum_hal / processed_count, 2)
+                    stats["avg_completeness"] = round(sum_comp / processed_count, 2)
+                    stats["avg_overall"] = round(sum_over / processed_count, 2)
+                    stats["hallucination_rate"] = round((stats["hallucinations_detected"] / processed_count) * 100, 1)
+
+                notice_msg = f"API rate limit reached at row {idx}. Displaying results for {processed_count} of {total} rows evaluated."
+                with _batch_lock:
+                    if batch_id in _batch_cache:
+                        _batch_cache[batch_id]["status"] = "completed"
+                        _batch_cache[batch_id]["processed_count"] = processed_count
+                        _batch_cache[batch_id]["statistics"] = stats
+                        _batch_cache[batch_id]["rate_limit_notice"] = notice_msg
+
+                try:
+                    update_batch_progress(batch_id, processed_count, "completed", statistics=stats)
+                except Exception as db_err:
+                    print(f"Rate limit batch DB update note: {db_err}")
+                return
+
             stats["failed"] += 1
             eval_rec = {
                 "id": idx,
@@ -465,20 +501,29 @@ def _run_batch_worker(batch_id: str, rows: list):
                 "completeness_score": 1.0,
                 "composite_score": 1.0,
                 "final_verdict": "Fail",
-                "verdict_summary": f"Evaluation error: {str(e)}",
+                "verdict_summary": f"Query evaluation skipped due to error: {err_str[:120]}",
                 "hallucination_detected": False,
                 "source_conflict_detected": False,
+                "relevance_details": {},
+                "accuracy_details": {},
+                "hallucination_details": {},
+                "completeness_details": {},
+                "verdict_details": {
+                    "final_verdict": "Fail",
+                    "overall_score": 1.0,
+                    "verdict_summary": f"Query processing error: {err_str[:120]}",
+                },
             }
 
         records.append(eval_rec)
-        processed = idx
+        processed = len(records)
         stats["processed"] = processed
-        stats["avg_relevance"] = round(sum_rel / processed, 2)
-        stats["avg_accuracy"] = round(sum_acc / processed, 2)
-        stats["avg_hallucination"] = round(sum_hal / processed, 2)
-        stats["avg_completeness"] = round(sum_comp / processed, 2)
-        stats["avg_overall"] = round(sum_over / processed, 2)
-        stats["hallucination_rate"] = round((stats["hallucinations_detected"] / processed) * 100, 1)
+        stats["avg_relevance"] = round(sum_rel / processed, 2) if processed > 0 else 0.0
+        stats["avg_accuracy"] = round(sum_acc / processed, 2) if processed > 0 else 0.0
+        stats["avg_hallucination"] = round(sum_hal / processed, 2) if processed > 0 else 0.0
+        stats["avg_completeness"] = round(sum_comp / processed, 2) if processed > 0 else 0.0
+        stats["avg_overall"] = round(sum_over / processed, 2) if processed > 0 else 0.0
+        stats["hallucination_rate"] = round((stats["hallucinations_detected"] / processed) * 100, 1) if processed > 0 else 0.0
 
         with _batch_lock:
             if batch_id in _batch_cache:

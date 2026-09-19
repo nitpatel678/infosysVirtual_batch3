@@ -421,6 +421,15 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   )}
                   <span>{results.verdict.status}</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="btn-new-query"
+                  title="Clear and evaluate a new query"
+                >
+                  <RotateCcw size={13} />
+                  <span>New Query</span>
+                </button>
               </div>
             </div>
 
