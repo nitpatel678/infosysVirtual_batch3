@@ -64,6 +64,21 @@ function getScoreColorClass(score) {
   return 'score-card-red'
 }
 
+function getAccCategory(score, category, contradiction) {
+  if (contradiction) return 'Contradictory'
+  if (score <= 2.0) return 'Incorrect'
+  if (category === 'Correct' && score < 3.5) return 'Partially Correct'
+  return category || (score >= 4.0 ? 'Correct' : score >= 2.5 ? 'Partially Correct' : 'Incorrect')
+}
+
+function getCategoryBadgeClass(category) {
+  const cat = (category || '').toLowerCase()
+  if (cat.includes('correct') && !cat.includes('in') && !cat.includes('partially')) return 'badge-cat-pass'
+  if (cat.includes('partially') || cat.includes('mostly')) return 'badge-cat-warn'
+  if (cat.includes('incorrect') || cat.includes('contradict') || cat.includes('severely') || cat.includes('substantially')) return 'badge-cat-fail'
+  return 'badge-cat-neutral'
+}
+
 export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }) {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
@@ -560,8 +575,8 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   </div>
                   {results.scores.accuracy.accuracy_category && (
                     <div className="agent-header-badges">
-                      <span className="agent-sub-pill">
-                        {results.scores.accuracy.accuracy_category}
+                      <span className={`agent-sub-pill ${getCategoryBadgeClass(getAccCategory(results.scores.accuracy.score, results.scores.accuracy.accuracy_category, results.scores.accuracy.contradiction_detected))}`}>
+                        {getAccCategory(results.scores.accuracy.score, results.scores.accuracy.accuracy_category, results.scores.accuracy.contradiction_detected)}
                       </span>
                     </div>
                   )}
@@ -848,8 +863,8 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     </div>
                     {results.scores.accuracy.accuracy_category && (
                       <div className="agent-header-badges">
-                        <span className="agent-sub-pill">
-                          {results.scores.accuracy.accuracy_category}
+                        <span className={`agent-sub-pill ${getCategoryBadgeClass(getAccCategory(results.scores.accuracy.score, results.scores.accuracy.accuracy_category, results.scores.accuracy.contradiction_detected))}`}>
+                          {getAccCategory(results.scores.accuracy.score, results.scores.accuracy.accuracy_category, results.scores.accuracy.contradiction_detected)}
                         </span>
                       </div>
                     )}

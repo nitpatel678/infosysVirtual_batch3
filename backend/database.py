@@ -188,7 +188,30 @@ def get_evaluations(limit=50):
                 LIMIT %s;
             """, (limit,))
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            results = []
+            json_cols = [
+                "relevance_details",
+                "accuracy_details",
+                "hallucination_details",
+                "completeness_details",
+                "verdict_details"
+            ]
+            for r in rows:
+                rec = dict(r)
+                for col in json_cols:
+                    val = rec.get(col)
+                    if isinstance(val, str):
+                        try:
+                            rec[col] = json.loads(val)
+                        except Exception:
+                            rec[col] = {}
+                acc_details = rec.get("accuracy_details") or {}
+                acc_score = float(rec.get("accuracy_score") or 0.0)
+                if acc_score <= 2.0 and acc_details.get("accuracy_category") == "Correct":
+                    acc_details["accuracy_category"] = "Incorrect"
+                    rec["accuracy_details"] = acc_details
+                results.append(rec)
+            return results
     finally:
         conn.close()
 
@@ -202,7 +225,30 @@ def get_evaluation_by_id(eval_id):
                 WHERE id = %s;
             """, (eval_id,))
             row = cur.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            record = dict(row)
+            json_cols = [
+                "retrieved_evidence",
+                "relevance_details",
+                "accuracy_details",
+                "hallucination_details",
+                "completeness_details",
+                "verdict_details"
+            ]
+            for col in json_cols:
+                val = record.get(col)
+                if isinstance(val, str):
+                    try:
+                        record[col] = json.loads(val)
+                    except Exception:
+                        record[col] = {} if col != "retrieved_evidence" else []
+            acc_details = record.get("accuracy_details") or {}
+            acc_score = float(record.get("accuracy_score") or 0.0)
+            if acc_score <= 2.0 and acc_details.get("accuracy_category") == "Correct":
+                acc_details["accuracy_category"] = "Incorrect"
+                record["accuracy_details"] = acc_details
+            return record
     finally:
         conn.close()
 
@@ -272,11 +318,11 @@ def get_batch_records(batch_id):
         conn.close()
 
 
-def get_analytics_summary():
+def get_analytics_summary(start_date=None, end_date=None):
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
+            query = """
                 SELECT 
                     id,
                     created_at,
@@ -289,8 +335,22 @@ def get_analytics_summary():
                     hallucination_details,
                     verdict_details
                 FROM evaluation_records
-                ORDER BY created_at ASC;
-            """)
+                WHERE 1=1
+            """
+            params = []
+            if start_date:
+                query += " AND created_at >= %s"
+                params.append(start_date)
+            if end_date:
+                if len(end_date) == 10:
+                    end_date_full = f"{end_date} 23:59:59.999999"
+                else:
+                    end_date_full = end_date
+                query += " AND created_at <= %s"
+                params.append(end_date_full)
+
+            query += " ORDER BY created_at ASC;"
+            cur.execute(query, tuple(params))
             records = cur.fetchall()
 
             total = len(records)

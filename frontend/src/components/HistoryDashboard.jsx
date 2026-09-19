@@ -14,8 +14,41 @@ import {
   AlertTriangle,
   Scale,
   Loader2,
-  Layers
+  Layers,
+  Sparkles,
+  HelpCircle,
 } from 'lucide-react'
+
+function safeParse(val, fallback = {}) {
+  if (!val) return fallback
+  if (typeof val === 'object') return val
+  try {
+    return JSON.parse(val)
+  } catch {
+    return fallback
+  }
+}
+
+function getScoreColorClass(score) {
+  if (score >= 4.0) return 'score-card-pass'
+  if (score >= 3.0) return 'score-card-warn'
+  return 'score-card-fail'
+}
+
+function getAccCategory(score, category, contradiction) {
+  if (contradiction) return 'Contradictory'
+  if (score <= 2.0) return 'Incorrect'
+  if (category === 'Correct' && score < 3.5) return 'Partially Correct'
+  return category || (score >= 4.0 ? 'Correct' : score >= 2.5 ? 'Partially Correct' : 'Incorrect')
+}
+
+function getCategoryBadgeClass(category) {
+  const cat = (category || '').toLowerCase()
+  if (cat.includes('correct') && !cat.includes('in') && !cat.includes('partially')) return 'badge-cat-pass'
+  if (cat.includes('partially') || cat.includes('mostly')) return 'badge-cat-warn'
+  if (cat.includes('incorrect') || cat.includes('contradict') || cat.includes('severely') || cat.includes('substantially')) return 'badge-cat-fail'
+  return 'badge-cat-neutral'
+}
 
 export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
   const [records, setRecords] = useState([])
@@ -82,19 +115,30 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     }
   }
 
-  function getScoreColorClass(score) {
-    if (score >= 4.0) return 'score-card-pass'
-    if (score >= 3.0) return 'score-card-warn'
-    return 'score-card-fail'
-  }
-
   if (selectedRecordId !== null) {
+    const relDetails = safeParse(recordDetail?.relevance_details)
+    const accDetails = safeParse(recordDetail?.accuracy_details)
+    const halDetails = safeParse(recordDetail?.hallucination_details)
+    const compDetails = safeParse(recordDetail?.completeness_details)
+    const verdDetails = safeParse(recordDetail?.verdict_details)
+    const evidenceList = safeParse(recordDetail?.retrieved_evidence, [])
+
+    const accScore = recordDetail?.accuracy_score || 0.0
+    const accContradiction = accDetails.contradiction_detected || false
+    const calibratedAccCategory = getAccCategory(accScore, accDetails.accuracy_category, accContradiction)
+
+    const verdictStatus = recordDetail?.final_verdict || verdDetails.status || 'EVALUATED'
+    const isPass = verdictStatus.toLowerCase().includes('pass')
+    const isNeeds = verdictStatus.toLowerCase().includes('needs') || verdictStatus.toLowerCase().includes('moderate')
+    const isUnverified = verdictStatus.toLowerCase().includes('unverified')
+    const hasConflict = verdDetails.source_conflict_detected || compDetails.source_conflict_detected || accContradiction
+
     return (
       <div className="history-container">
         <div className="report-nav-bar">
           <button type="button" onClick={handleBackToRecords} className="history-back-btn">
             <ArrowLeft size={15} />
-            <span>Back to Records</span>
+            <span>Back to Records List</span>
           </button>
           <button type="button" onClick={onBackToForm} className="nav-history-btn nav-new-btn">
             <RotateCcw size={14} />
@@ -114,6 +158,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
           </div>
         ) : recordDetail ? (
           <div className="results-container record-dashboard-view">
+            {/* Top Response Context Card */}
             <div className="top-response-card">
               <div className="top-response-header">
                 <div className="top-response-meta">
@@ -130,15 +175,18 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       <span className="top-score-scale">/ 5.00</span>
                     </div>
                   </div>
-                  <div className={`verdict-mini-badge ${recordDetail.final_verdict === 'PASS' ? 'verdict-mini-pass' : 'verdict-mini-fail'}`}>
-                    {recordDetail.final_verdict === 'PASS' ? (
-                      <CheckCircle2 size={14} />
-                    ) : (
-                      <XCircle size={14} />
-                    )}
-                    <span>{recordDetail.final_verdict}</span>
+                  <div className={`verdict-mini-badge ${isPass ? 'verdict-mini-pass' : isNeeds ? 'verdict-mini-warn' : isUnverified ? 'verdict-mini-neutral' : 'verdict-mini-fail'}`}>
+                    {isPass ? <CheckCircle2 size={14} /> : isNeeds ? <AlertTriangle size={14} /> : isUnverified ? <HelpCircle size={14} /> : <XCircle size={14} />}
+                    <span>{verdictStatus}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="ai-response-content">
+                <span className="context-label" style={{ marginBottom: 6, display: 'block' }}>Evaluated AI Response:</span>
+                {recordDetail.ai_response?.split('\n').map((line, idx) => (
+                  <p key={idx} className="ai-response-paragraph">{line}</p>
+                ))}
               </div>
 
               <div className="context-subgrid">
@@ -161,32 +209,26 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                   </div>
                 )}
               </div>
-
-              <div className="ai-response-content">
-                <span className="context-label" style={{ marginBottom: 6, display: 'block' }}>Evaluated AI Response:</span>
-                {recordDetail.ai_response?.split('\n').map((line, idx) => (
-                  <p key={idx} className="ai-response-paragraph">{line}</p>
-                ))}
-              </div>
             </div>
 
+            {/* Comprehensive Verdict Banner with Strengths & Issues */}
             <div className={`verdict-banner ${
-              recordDetail.final_verdict === 'PASS'
+              isPass
                 ? 'verdict-banner-pass'
-                : recordDetail.final_verdict === 'UNVERIFIED'
-                ? 'verdict-banner-unverified'
-                : recordDetail.final_verdict === 'MODERATE'
+                : isNeeds
                 ? 'verdict-banner-moderate'
+                : isUnverified
+                ? 'verdict-banner-unverified'
                 : 'verdict-banner-fail'
             }`}>
               <div className="verdict-banner-left">
                 <div className="verdict-icon-wrapper">
-                  {recordDetail.final_verdict === 'PASS' ? (
+                  {isPass ? (
                     <CheckCircle2 size={26} />
-                  ) : recordDetail.final_verdict === 'UNVERIFIED' ? (
-                    <AlertCircle size={26} />
-                  ) : recordDetail.final_verdict === 'MODERATE' ? (
+                  ) : isNeeds ? (
                     <AlertTriangle size={26} />
+                  ) : isUnverified ? (
+                    <AlertCircle size={26} />
                   ) : (
                     <XCircle size={26} />
                   )}
@@ -194,20 +236,47 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 <div>
                   <div className="verdict-label-row">
                     <span className="verdict-status-title">
-                      FINAL VERDICT: {recordDetail.final_verdict}
+                      FINAL VERDICT: {verdictStatus}
+                    </span>
+                    {hasConflict && (
+                      <span className="conflict-tag-pill" title="Discrepancy detected between Reference Ground Truth and Benchmark Knowledge Base">
+                        Conflict in Ground Truth
+                      </span>
+                    )}
+                    <span className="formula-tag-pill">
+                      Weights: 25% Rel • 35% Acc • 25% Hal • 15% Comp
                     </span>
                   </div>
-                  <p className="verdict-summary-text">{recordDetail.verdict_summary}</p>
+                  <p className="verdict-summary-text">{recordDetail.verdict_summary || verdDetails.summary}</p>
+
+                  {verdDetails.major_issues && verdDetails.major_issues.length > 0 && (
+                    <div className="verdict-issues-row">
+                      <span className="issues-label">Key Issues:</span>
+                      {verdDetails.major_issues.map((iss, i) => (
+                        <span key={i} className="issue-pill">⚠ {iss}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {verdDetails.strengths && verdDetails.strengths.length > 0 && (
+                    <div className="verdict-issues-row">
+                      <span className="issues-label">Strengths:</span>
+                      {verdDetails.strengths.map((str, i) => (
+                        <span key={i} className="strength-pill">✓ {str}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="verdict-banner-score">
-                <span className="composite-label">Overall Composite</span>
+                <span className="composite-label">Weighted Overall</span>
                 <span className="composite-number">{recordDetail.composite_score?.toFixed(2)}</span>
                 <span className="composite-max">/ 5.00</span>
               </div>
             </div>
 
+            {/* Agent Scores & Reasoning Section */}
             <div className="agent-scores-section">
               <div className="section-header-row">
                 <h3 className="section-subtitle">Evaluation Agent Scores & Reasoning</h3>
@@ -261,6 +330,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 </button>
               </div>
 
+              {/* 1. Relevance Judge Tab */}
               {activeAgentTab === 'relevance' && (
                 <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.relevance_score)}`}>
                   <div className="agent-card-header">
@@ -273,10 +343,10 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         {recordDetail.relevance_score?.toFixed(1)} / 5.0
                       </span>
                     </div>
-                    {recordDetail.relevance_details?.relevance_category && (
+                    {relDetails.relevance_category && (
                       <div className="agent-header-badges">
-                        <span className="agent-sub-pill">
-                          {recordDetail.relevance_details.relevance_category}
+                        <span className={`agent-sub-pill ${getCategoryBadgeClass(relDetails.relevance_category)}`}>
+                          {relDetails.relevance_category}
                         </span>
                       </div>
                     )}
@@ -287,13 +357,13 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       style={{ width: `${(recordDetail.relevance_score / 5) * 100}%` }}
                     />
                   </div>
-                  <p className="agent-reasoning">{recordDetail.relevance_reasoning}</p>
+                  <p className="agent-reasoning">{recordDetail.relevance_reasoning || relDetails.reasoning}</p>
 
-                  {recordDetail.relevance_details?.key_alignment_points && recordDetail.relevance_details.key_alignment_points.length > 0 && (
+                  {relDetails.key_alignment_points && relDetails.key_alignment_points.length > 0 && (
                     <div className="agent-sub-section">
                       <span className="agent-sub-title">Direct Question Alignments:</span>
                       <ul className="agent-sub-list">
-                        {recordDetail.relevance_details.key_alignment_points.map((pt, i) => (
+                        {relDetails.key_alignment_points.map((pt, i) => (
                           <li key={i} className="agent-sub-item item-align">
                             <span className="sub-bullet">✓</span>
                             <span>{pt}</span>
@@ -303,11 +373,11 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     </div>
                   )}
 
-                  {recordDetail.relevance_details?.missed_aspects && recordDetail.relevance_details.missed_aspects.length > 0 && (
+                  {relDetails.missed_aspects && relDetails.missed_aspects.length > 0 && (
                     <div className="agent-sub-section">
                       <span className="agent-sub-title">Missed Query Nuances:</span>
                       <ul className="agent-sub-list">
-                        {recordDetail.relevance_details.missed_aspects.map((pt, i) => (
+                        {relDetails.missed_aspects.map((pt, i) => (
                           <li key={i} className="agent-sub-item item-missed">
                             <span className="sub-bullet">⚠</span>
                             <span>{pt}</span>
@@ -319,6 +389,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 </div>
               )}
 
+              {/* 2. Accuracy Judge Tab */}
               {activeAgentTab === 'accuracy' && (
                 <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.accuracy_score)}`}>
                   <div className="agent-card-header">
@@ -331,13 +402,14 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         {recordDetail.accuracy_score?.toFixed(1)} / 5.0
                       </span>
                     </div>
-                    {recordDetail.accuracy_details?.accuracy_category && (
-                      <div className="agent-header-badges">
-                        <span className="agent-sub-pill">
-                          {recordDetail.accuracy_details.accuracy_category}
-                        </span>
-                      </div>
-                    )}
+                    <div className="agent-header-badges">
+                      <span className={`agent-sub-pill ${getCategoryBadgeClass(calibratedAccCategory)}`}>
+                        {calibratedAccCategory}
+                      </span>
+                      {accContradiction && (
+                        <span className="conflict-tag-pill">Contradiction Detected</span>
+                      )}
+                    </div>
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -346,30 +418,30 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     />
                   </div>
 
-                  {recordDetail.accuracy_details?.contradiction_detected && (
+                  {accContradiction && (
                     <div className="agent-notice-banner notice-contradiction">
                       <AlertTriangle size={14} />
-                      <span><strong>Contradiction Warning:</strong> Reference ground truth directly conflicts with retrieved benchmark chunks.</span>
+                      <span><strong>Contradiction Warning:</strong> Reference ground truth directly conflicts with benchmark evidence.</span>
                     </div>
                   )}
 
-                  {recordDetail.accuracy_details?.is_insufficient_evidence && (
+                  {accDetails.is_insufficient_evidence && (
                     <div className="agent-notice-banner notice-insufficient">
                       <AlertCircle size={14} />
                       <span><strong>Closed-World Grounding Notice:</strong> No reference answer or matching knowledge base evidence was available. Score is marked Unverified.</span>
                     </div>
                   )}
 
-                  <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
+                  <p className="agent-reasoning">{recordDetail.accuracy_reasoning || accDetails.reasoning}</p>
 
-                  {recordDetail.accuracy_details?.verified_claims && recordDetail.accuracy_details.verified_claims.length > 0 && (
+                  {accDetails.verified_claims && accDetails.verified_claims.length > 0 && (
                     <div className="agent-sub-section">
-                      <span className="agent-sub-title">Fact-Checked Claims ({recordDetail.accuracy_details.verified_claims.length}):</span>
+                      <span className="agent-sub-title">Fact-Checked Claims ({accDetails.verified_claims.length}):</span>
                       <div className="claims-list">
-                        {recordDetail.accuracy_details.verified_claims.map((c, i) => (
+                        {accDetails.verified_claims.map((c, i) => (
                           <div key={i} className="claim-box">
                             <div className="claim-header">
-                              <span className={`claim-badge badge-${c.verdict?.toLowerCase()}`}>
+                              <span className={`claim-badge badge-${(c.verdict || '').toLowerCase().replace(/\s+/g, '-')}`}>
                                 {c.verdict}
                               </span>
                               {c.evidence_source && c.evidence_source !== 'None' && (
@@ -385,9 +457,21 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       </div>
                     </div>
                   )}
+
+                  {accDetails.evidence_citations && accDetails.evidence_citations.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Evidence Citations:</span>
+                      <div className="citations-list">
+                        {accDetails.evidence_citations.map((cit, i) => (
+                          <span key={i} className="citation-pill">{cit}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* 3. Hallucination Agent Tab */}
               {activeAgentTab === 'hallucination' && (
                 <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.hallucination_score)}`}>
                   <div className="agent-card-header">
@@ -401,15 +485,15 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       </span>
                     </div>
                     <div className="agent-header-badges">
-                      {recordDetail.hallucination_details?.hallucination_level && (
-                        <span className="agent-sub-pill">
-                          {recordDetail.hallucination_details.hallucination_level}
+                      {halDetails.hallucination_level && (
+                        <span className={`agent-sub-pill ${getCategoryBadgeClass(halDetails.hallucination_level)}`}>
+                          {halDetails.hallucination_level}
                         </span>
                       )}
-                      <span className={`hal-status-tag ${(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
-                        {(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0)
+                      <span className={`hal-status-tag ${(!halDetails.hallucination_count || halDetails.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
+                        {(!halDetails.hallucination_count || halDetails.hallucination_count === 0)
                           ? '0 Flagged Statements'
-                          : `${recordDetail.hallucination_details.hallucination_count} Statement(s) Flagged`}
+                          : `${halDetails.hallucination_count} Statement(s) Flagged`}
                       </span>
                     </div>
                   </div>
@@ -420,23 +504,23 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     />
                   </div>
 
-                  {recordDetail.hallucination_details?.is_insufficient_evidence && (
+                  {halDetails.is_insufficient_evidence && (
                     <div className="agent-notice-banner notice-insufficient">
                       <AlertCircle size={15} />
                       <span><strong>Closed-World Evaluation Notice:</strong> Grounding status cannot be established without reference context or benchmark chunks.</span>
                     </div>
                   )}
 
-                  <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
+                  <p className="agent-reasoning">{recordDetail.hallucination_reasoning || halDetails.reasoning}</p>
 
-                  {recordDetail.hallucination_details?.flagged_claims && recordDetail.hallucination_details.flagged_claims.length > 0 && (
+                  {halDetails.flagged_claims && halDetails.flagged_claims.length > 0 && (
                     <div className="agent-sub-section">
                       <div className="flex-between">
-                        <span className="agent-sub-title">Statement-by-Statement Hallucination Audit ({recordDetail.hallucination_details.flagged_claims.length} claims):</span>
+                        <span className="agent-sub-title">Statement-by-Statement Hallucination Audit ({halDetails.flagged_claims.length} claims):</span>
                         <span className="section-hint-badge">Cross-referenced against RAG & Ground Truth</span>
                       </div>
                       <div className="claims-list">
-                        {recordDetail.hallucination_details.flagged_claims.map((c, i) => {
+                        {halDetails.flagged_claims.map((c, i) => {
                           const isFlagged = c.is_flagged || ['unsupported', 'fabricated', 'contradictory', 'ungrounded'].includes(c.classification?.toLowerCase() || c.grounding_status?.toLowerCase());
                           const badgeClass = (c.classification || c.grounding_status || '').toLowerCase().replace(/\s+/g, '-');
                           return (
@@ -468,6 +552,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                 </div>
               )}
 
+              {/* 4. Completeness Judge Tab */}
               {activeAgentTab === 'completeness' && (
                 <div className={`agent-card agent-card-full ${getScoreColorClass(recordDetail.completeness_score)}`}>
                   <div className="agent-card-header">
@@ -480,6 +565,18 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         {recordDetail.completeness_score?.toFixed(1)} / 5.0
                       </span>
                     </div>
+                    <div className="agent-header-badges">
+                      {compDetails.completeness_category && (
+                        <span className={`agent-sub-pill ${getCategoryBadgeClass(compDetails.completeness_category)}`}>
+                          {compDetails.completeness_category}
+                        </span>
+                      )}
+                      {compDetails.source_conflict_detected && (
+                        <span className="conflict-tag-pill" title="Discrepancy detected between Reference Ground Truth and Benchmark Knowledge Base">
+                          Conflict in Ground Truth
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="score-bar-bg">
                     <div
@@ -487,12 +584,56 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       style={{ width: `${(recordDetail.completeness_score / 5) * 100}%` }}
                     />
                   </div>
-                  <p className="agent-reasoning">{recordDetail.completeness_reasoning}</p>
+                  <p className="agent-reasoning">{recordDetail.completeness_reasoning || compDetails.reasoning}</p>
+
+                  {compDetails.identified_requirements && compDetails.identified_requirements.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Identified Question Requirements:</span>
+                      <ul className="agent-sub-list">
+                        {compDetails.identified_requirements.map((req, i) => (
+                          <li key={i} className="agent-sub-item item-req">
+                            <span className="sub-bullet">•</span>
+                            <span>{req}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {compDetails.addressed_aspects && compDetails.addressed_aspects.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Addressed Aspects:</span>
+                      <ul className="agent-sub-list">
+                        {compDetails.addressed_aspects.map((pt, i) => (
+                          <li key={i} className="agent-sub-item item-align">
+                            <span className="sub-bullet">✓</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {compDetails.missing_aspects && compDetails.missing_aspects.length > 0 && (
+                    <div className="agent-sub-section">
+                      <span className="agent-sub-title">Missing / Omitted Aspects:</span>
+                      <ul className="agent-sub-list">
+                        {compDetails.missing_aspects.map((pt, i) => (
+                          <li key={i} className="agent-sub-item item-missed">
+                            <span className="sub-bullet">⚠</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* 5. All 4 Overview Tab */}
               {activeAgentTab === 'all' && (
                 <div className="agent-grid-2col">
+                  {/* Relevance */}
                   <div className={`agent-card ${getScoreColorClass(recordDetail.relevance_score)}`}>
                     <div className="agent-card-header">
                       <div className="agent-header-top">
@@ -504,10 +645,10 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                           {recordDetail.relevance_score?.toFixed(1)} / 5.0
                         </span>
                       </div>
-                      {recordDetail.relevance_details?.relevance_category && (
+                      {relDetails.relevance_category && (
                         <div className="agent-header-badges">
-                          <span className="agent-sub-pill">
-                            {recordDetail.relevance_details.relevance_category}
+                          <span className={`agent-sub-pill ${getCategoryBadgeClass(relDetails.relevance_category)}`}>
+                            {relDetails.relevance_category}
                           </span>
                         </div>
                       )}
@@ -518,9 +659,10 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         style={{ width: `${(recordDetail.relevance_score / 5) * 100}%` }}
                       />
                     </div>
-                    <p className="agent-reasoning">{recordDetail.relevance_reasoning}</p>
+                    <p className="agent-reasoning">{recordDetail.relevance_reasoning || relDetails.reasoning}</p>
                   </div>
 
+                  {/* Hallucination */}
                   <div className={`agent-card ${getScoreColorClass(recordDetail.hallucination_score)}`}>
                     <div className="agent-card-header">
                       <div className="agent-header-top">
@@ -533,15 +675,15 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         </span>
                       </div>
                       <div className="agent-header-badges">
-                        {recordDetail.hallucination_details?.hallucination_level && (
-                          <span className="agent-sub-pill">
-                            {recordDetail.hallucination_details.hallucination_level}
+                        {halDetails.hallucination_level && (
+                          <span className={`agent-sub-pill ${getCategoryBadgeClass(halDetails.hallucination_level)}`}>
+                            {halDetails.hallucination_level}
                           </span>
                         )}
-                        <span className={`hal-status-tag ${(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
-                          {(!recordDetail.hallucination_details?.hallucination_count || recordDetail.hallucination_details.hallucination_count === 0)
+                        <span className={`hal-status-tag ${(!halDetails.hallucination_count || halDetails.hallucination_count === 0) ? 'hal-tag-clean' : 'hal-tag-warn'}`}>
+                          {(!halDetails.hallucination_count || halDetails.hallucination_count === 0)
                             ? '0 Ungrounded'
-                            : `${recordDetail.hallucination_details.hallucination_count} Flagged`}
+                            : `${halDetails.hallucination_count} Flagged`}
                         </span>
                       </div>
                     </div>
@@ -551,9 +693,10 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         style={{ width: `${(recordDetail.hallucination_score / 5) * 100}%` }}
                       />
                     </div>
-                    <p className="agent-reasoning">{recordDetail.hallucination_reasoning}</p>
+                    <p className="agent-reasoning">{recordDetail.hallucination_reasoning || halDetails.reasoning}</p>
                   </div>
 
+                  {/* Accuracy */}
                   <div className={`agent-card ${getScoreColorClass(recordDetail.accuracy_score)}`}>
                     <div className="agent-card-header">
                       <div className="agent-header-top">
@@ -565,13 +708,11 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                           {recordDetail.accuracy_score?.toFixed(1)} / 5.0
                         </span>
                       </div>
-                      {recordDetail.accuracy_details?.accuracy_category && (
-                        <div className="agent-header-badges">
-                          <span className="agent-sub-pill">
-                            {recordDetail.accuracy_details.accuracy_category}
-                          </span>
-                        </div>
-                      )}
+                      <div className="agent-header-badges">
+                        <span className={`agent-sub-pill ${getCategoryBadgeClass(calibratedAccCategory)}`}>
+                          {calibratedAccCategory}
+                        </span>
+                      </div>
                     </div>
                     <div className="score-bar-bg">
                       <div
@@ -579,9 +720,10 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         style={{ width: `${(recordDetail.accuracy_score / 5) * 100}%` }}
                       />
                     </div>
-                    <p className="agent-reasoning">{recordDetail.accuracy_reasoning}</p>
+                    <p className="agent-reasoning">{recordDetail.accuracy_reasoning || accDetails.reasoning}</p>
                   </div>
 
+                  {/* Completeness */}
                   <div className={`agent-card ${getScoreColorClass(recordDetail.completeness_score)}`}>
                     <div className="agent-card-header">
                       <div className="agent-header-top">
@@ -593,6 +735,13 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                           {recordDetail.completeness_score?.toFixed(1)} / 5.0
                         </span>
                       </div>
+                      {compDetails.completeness_category && (
+                        <div className="agent-header-badges">
+                          <span className={`agent-sub-pill ${getCategoryBadgeClass(compDetails.completeness_category)}`}>
+                            {compDetails.completeness_category}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="score-bar-bg">
                       <div
@@ -600,13 +749,13 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                         style={{ width: `${(recordDetail.completeness_score / 5) * 100}%` }}
                       />
                     </div>
-                    <p className="agent-reasoning">{recordDetail.completeness_reasoning}</p>
+                    <p className="agent-reasoning">{recordDetail.completeness_reasoning || compDetails.reasoning}</p>
                   </div>
                 </div>
               )}
-
             </div>
 
+            {/* Grounding Evidence from FAISS Benchmark */}
             <div className="column-card">
               <div className="card-header flex-between">
                 <div>
@@ -614,13 +763,13 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                   <p className="evidence-desc-text">Retrieved semantic evidence from benchmark knowledge base</p>
                 </div>
                 <span className="evidence-count-badge">
-                  {recordDetail.retrieved_evidence ? recordDetail.retrieved_evidence.length : 0} Chunks
+                  {evidenceList.length} Chunks
                 </span>
               </div>
 
               <div className="evidence-cards-list">
-                {recordDetail.retrieved_evidence && recordDetail.retrieved_evidence.length > 0 ? (
-                  recordDetail.retrieved_evidence.map((evidence, idx) => (
+                {evidenceList.length > 0 ? (
+                  evidenceList.map((evidence, idx) => (
                     <div key={idx} className="evidence-card">
                       <div className="evidence-meta">
                         <div className="evidence-source-tags">
@@ -629,9 +778,9 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                             <span className="evidence-category-badge">{evidence.category}</span>
                           )}
                         </div>
-                        {evidence.similarity_score !== undefined && (
+                        {evidence.score !== undefined && (
                           <div className="evidence-sim-pill">
-                            <span>{(evidence.similarity_score * 100).toFixed(1)}% Match</span>
+                            <span>{(evidence.score * 100).toFixed(1)}% Match</span>
                           </div>
                         )}
                       </div>
@@ -642,13 +791,13 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                             <p className="qa-text">{evidence.question}</p>
                           </div>
                         )}
-                        {evidence.ground_truth && (
+                        {evidence.answer && (
                           <div className="evidence-qa-row">
                             <span className="qa-label">Ground Truth:</span>
-                            <p className="qa-text qa-truth">{evidence.ground_truth}</p>
+                            <p className="qa-text qa-truth">{evidence.answer}</p>
                           </div>
                         )}
-                        {evidence.text && !evidence.question && (
+                        {evidence.text && (
                           <p className="evidence-body">{evidence.text}</p>
                         )}
                       </div>
@@ -667,6 +816,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     )
   }
 
+  // List View (All Records Table)
   return (
     <div className="history-container">
       <div className="history-header">
@@ -708,34 +858,39 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
           <table className="history-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Date & Time</th>
-                <th>Question</th>
-                <th>AI Response</th>
-                <th>Source Doc</th>
-                <th>Scores (Rel / Acc / Hal / Comp)</th>
-                <th>Composite</th>
-                <th>Verdict</th>
-                <th>Action</th>
+                <th className="col-id">ID</th>
+                <th className="col-date">Date & Time</th>
+                <th className="col-q">Question</th>
+                <th className="col-resp">AI Response</th>
+                <th className="col-doc">Source</th>
+                <th className="col-scores">Scores (R/A/H/C)</th>
+                <th className="col-comp">Score</th>
+                <th className="col-verd">Verdict</th>
+                <th className="col-action">Action</th>
               </tr>
             </thead>
             <tbody>
               {records.map((r) => {
-                const isPass = r.final_verdict === 'PASS'
+                const v = (r.final_verdict || '').toLowerCase()
+                const isPass = v.includes('pass')
+                const isNeeds = v.includes('needs') || v.includes('moderate')
+                const isUnver = v.includes('unverified')
+                const verdictClass = isPass ? 'verdict-pass' : isNeeds ? 'verdict-moderate' : isUnver ? 'verdict-unverified' : 'verdict-fail'
+
                 return (
                   <tr key={r.id} className="history-row">
                     <td className="row-id">#{r.id}</td>
                     <td className="row-date">{formatDate(r.created_at)}</td>
                     <td className="row-q" title={r.question}>
-                      {r.question.length > 35 ? r.question.substring(0, 35) + '...' : r.question}
+                      {r.question.length > 32 ? r.question.substring(0, 32) + '...' : r.question}
                     </td>
                     <td className="row-resp" title={r.ai_response}>
-                      {r.ai_response.length > 40 ? r.ai_response.substring(0, 40) + '...' : r.ai_response}
+                      {r.ai_response.length > 36 ? r.ai_response.substring(0, 36) + '...' : r.ai_response}
                     </td>
                     <td className="row-doc">
                       {r.source_document_name ? (
                         <span className="doc-pill" title={r.source_document_name}>
-                          {r.source_document_name.length > 15 ? r.source_document_name.substring(0, 15) + '...' : r.source_document_name}
+                          PDF
                         </span>
                       ) : (
                         <span className="text-muted">-</span>
@@ -762,15 +917,15 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       <strong>{r.composite_score?.toFixed(2)}</strong>
                     </td>
                     <td className="row-verdict">
-                      <span className={`verdict-pill ${isPass ? 'verdict-pass' : 'verdict-fail'}`}>
-                        {isPass ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                      <span className={`verdict-pill ${verdictClass}`}>
+                        {isPass ? <CheckCircle2 size={12} /> : isNeeds ? <AlertTriangle size={12} /> : isUnver ? <HelpCircle size={12} /> : <XCircle size={12} />}
                         {r.final_verdict}
                       </span>
                     </td>
-                    <td className="row-action">
+                    <td className="row-action sticky-col">
                       <button
                         type="button"
-                        className="view-btn"
+                        className="view-record-btn"
                         onClick={() => handleViewRecord(r.id)}
                         title="View Full Evaluation Report"
                       >

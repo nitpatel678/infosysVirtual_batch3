@@ -672,12 +672,13 @@ def history_item(eval_id: int):
 
 
 @app.get("/api/analytics")
-def analytics():
+def analytics(start_date: Optional[str] = None, end_date: Optional[str] = None):
     try:
-        data = get_analytics_summary()
+        data = get_analytics_summary(start_date=start_date, end_date=end_date)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate analytics: {str(e)}")
+
 
 
 if __name__ == "__main__":

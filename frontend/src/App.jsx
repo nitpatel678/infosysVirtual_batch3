@@ -9,6 +9,7 @@ import './App.css'
 function App() {
   const [activeView, setActiveView] = useState('evaluate')
   const [selectedEvalId, setSelectedEvalId] = useState(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   function handleNavigateHome() {
     setSelectedEvalId(null)
@@ -25,18 +26,20 @@ function App() {
   }
 
   const viewTitles = {
-    evaluate: 'Single Evaluation Studio',
+    evaluate: 'Single Evaluation',
     batch: 'Batch CSV Evaluation Module',
     analytics: 'Analytics & Insights Dashboard',
     history: 'Evaluation History & Records',
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
         activeView={activeView}
         setActiveView={setActiveView}
         onNavigateHome={handleNavigateHome}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       <div className="app-main-area">

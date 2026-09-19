@@ -145,26 +145,53 @@ Return ONLY a JSON object strictly matching this schema:
     
     raw_category = str(result.get("accuracy_category", "")).strip()
     valid_categories = [
-        "Correct",
+        "Insufficient Evidence / Unverified",
+        "Contradictory",
         "Partially Correct",
         "Incorrect",
-        "Contradictory",
-        "Insufficient Evidence / Unverified"
+        "Correct"
     ]
     matched_category = None
+    # 1. Exact match first (case-insensitive)
     for vc in valid_categories:
-        if vc.lower() in raw_category.lower():
+        if raw_category.lower() == vc.lower():
             matched_category = vc
             break
+
+    # 2. If no exact match, check from most specific to least specific
     if not matched_category:
-        if contradiction:
-            matched_category = "Contradictory"
-        elif score >= 4.5:
+        for vc in [
+            "Insufficient Evidence / Unverified",
+            "Contradictory",
+            "Partially Correct",
+            "Incorrect",
+            "Correct"
+        ]:
+            if vc.lower() in raw_category.lower():
+                # Prevent matching "correct" inside "incorrect" or "partially correct"
+                if vc == "Correct" and ("incorrect" in raw_category.lower() or "partially" in raw_category.lower()):
+                    continue
+                matched_category = vc
+                break
+
+    # 3. Guardrails: enforce consistency between numerical score and accuracy category
+    if contradiction:
+        matched_category = "Contradictory"
+    elif not matched_category:
+        if score >= 4.5:
             matched_category = "Correct"
         elif score >= 3.0:
             matched_category = "Partially Correct"
         else:
             matched_category = "Incorrect"
+    else:
+        # Prevent contradictory category labels
+        if score <= 2.0 and matched_category == "Correct":
+            matched_category = "Incorrect"
+        elif score < 3.5 and matched_category == "Correct":
+            matched_category = "Partially Correct"
+        elif score >= 4.5 and matched_category == "Incorrect":
+            matched_category = "Correct"
 
     verified_claims = result.get("verified_claims", [])
     if not isinstance(verified_claims, list):
