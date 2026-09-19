@@ -17,6 +17,8 @@ import {
   Layers,
   Sparkles,
   HelpCircle,
+  Download,
+  FileDown,
 } from 'lucide-react'
 
 function safeParse(val, fallback = {}) {
@@ -59,6 +61,31 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const [activeAgentTab, setActiveAgentTab] = useState('relevance')
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+
+  async function handleDownloadPdf(evalId) {
+    if (!evalId) return
+    try {
+      setDownloadingPdf(true)
+      const res = await fetch(`http://127.0.0.1:8000/api/history/${evalId}/export-pdf`)
+      if (!res.ok) {
+        throw new Error('Failed to generate PDF audit report.')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `AI_Evaluation_Report_${evalId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      alert(err.message || 'Error downloading PDF report')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
 
   async function fetchHistory() {
     setLoading(true)
@@ -140,10 +167,31 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
             <ArrowLeft size={15} />
             <span>Back to Records List</span>
           </button>
-          <button type="button" onClick={onBackToForm} className="nav-history-btn nav-new-btn">
-            <RotateCcw size={14} />
-            <span>Back to Evaluator</span>
-          </button>
+          <div className="report-nav-actions">
+            <button
+              type="button"
+              onClick={() => handleDownloadPdf(selectedRecordId)}
+              className="btn-download-pdf"
+              disabled={downloadingPdf}
+              title="Download Formal PDF Evaluation Report"
+            >
+              {downloadingPdf ? (
+                <>
+                  <Loader2 size={14} className="spin-icon" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={14} />
+                  <span>Download PDF Report</span>
+                </>
+              )}
+            </button>
+            <button type="button" onClick={onBackToForm} className="nav-history-btn nav-new-btn">
+              <RotateCcw size={14} />
+              <span>Back to Evaluator</span>
+            </button>
+          </div>
         </div>
 
         {detailLoading ? (
@@ -175,7 +223,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       <span className="top-score-scale">/ 5.00</span>
                     </div>
                   </div>
-                  <div className={`verdict-mini-badge ${isPass ? 'verdict-mini-pass' : isNeeds ? 'verdict-mini-warn' : isUnverified ? 'verdict-mini-neutral' : 'verdict-mini-fail'}`}>
+                  <div className={`verdict-mini-badge ${isPass ? 'verdict-mini-pass' : isNeeds ? 'verdict-mini-warn' : isUnverified ? 'verdict-mini-unverified' : 'verdict-mini-fail'}`}>
                     {isPass ? <CheckCircle2 size={14} /> : isNeeds ? <AlertTriangle size={14} /> : isUnverified ? <HelpCircle size={14} /> : <XCircle size={14} />}
                     <span>{verdictStatus}</span>
                   </div>

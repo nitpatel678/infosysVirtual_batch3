@@ -5,9 +5,10 @@ import {
   BarChart3,
   Clock,
   Zap,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
+
 
 export default function Sidebar({
   activeView,
@@ -95,10 +96,10 @@ export default function Sidebar({
             type="button"
             className="sidebar-collapse-btn"
             onClick={onToggleCollapse}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar (>)' : 'Collapse sidebar (<)'}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
           </button>
         )}
       </div>

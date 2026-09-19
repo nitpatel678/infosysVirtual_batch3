@@ -671,6 +671,27 @@ def history_item(eval_id: int):
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
 
+@app.get("/api/history/{eval_id}/export-pdf")
+def export_history_pdf(eval_id: int):
+    try:
+        from report_generator import build_evaluation_pdf
+        record = get_evaluation_by_id(eval_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="Evaluation record not found")
+        pdf_bytes = build_evaluation_pdf(record)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=AI_Evaluation_Report_{eval_id}.pdf"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF report: {str(e)}")
+
+
 @app.get("/api/analytics")
 def analytics(start_date: Optional[str] = None, end_date: Optional[str] = None):
     try:
