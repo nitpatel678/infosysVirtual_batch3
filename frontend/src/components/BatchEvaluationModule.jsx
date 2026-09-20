@@ -21,6 +21,41 @@ import {
   ExternalLink,
 } from 'lucide-react'
 
+function safeNum(val, fallback = 0) {
+  if (val === null || val === undefined || val === '') return fallback
+  const num = Number(val)
+  return isNaN(num) ? fallback : num
+}
+
+function safeScore(val, digits = 1) {
+  if (val === null || val === undefined || val === '') return '—'
+  const num = Number(val)
+  return isNaN(num) ? '—' : num.toFixed(digits)
+}
+
+function safeParseJson(val) {
+  if (!val) return {}
+  if (typeof val === 'object') return val
+  try {
+    return JSON.parse(val)
+  } catch (e) {
+    return {}
+  }
+}
+
+function safeList(val) {
+  if (!val) return []
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val)
+      if (Array.isArray(parsed)) return parsed
+    } catch (e) {}
+    return [val]
+  }
+  return []
+}
+
 function getVerdictBadgeClass(verdict) {
   const v = (verdict || '').toLowerCase()
   if (v.includes('pass')) return 'badge-verdict-pass'
@@ -30,15 +65,335 @@ function getVerdictBadgeClass(verdict) {
 }
 
 function getScorePillClass(score) {
-  if (score >= 4.0) return 'score-pill-high'
-  if (score >= 3.0) return 'score-pill-med'
+  const s = safeNum(score)
+  if (s >= 4.0) return 'score-pill-high'
+  if (s >= 3.0) return 'score-pill-med'
   return 'score-pill-low'
 }
 
 function getScoreColorClass(score) {
-  if (score >= 4.0) return 'agent-good'
-  if (score >= 3.0) return 'agent-moderate'
+  const s = safeNum(score)
+  if (s >= 4.0) return 'agent-good'
+  if (s >= 3.0) return 'agent-moderate'
   return 'agent-poor'
+}
+
+class InspectErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error, info) {
+    console.error('Inspect modal render error caught:', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="modal-overlay" onClick={this.props.onClose}>
+          <div className="modal-dialog-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header flex-between">
+              <h3 className="modal-title">Record Inspection</h3>
+              <button type="button" className="modal-close-btn" onClick={this.props.onClose}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body-scroll" style={{ padding: '32px 24px', textAlign: 'center' }}>
+              <AlertTriangle size={36} color="#f59e0b" style={{ margin: '0 auto 12px auto' }} />
+              <h4 style={{ color: '#f8fafc', marginBottom: '8px' }}>Detailed breakdown unavailable</h4>
+              <p style={{ color: '#94a3b8', fontSize: '13px' }}>
+                This record may still be processing or has pending multi-agent evaluation output.
+              </p>
+            </div>
+            <div className="modal-footer flex-between">
+              <span />
+              <button type="button" className="btn-secondary" onClick={this.props.onClose}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function InspectModal({ record, onClose }) {
+  if (!record) return null
+
+  const relDetails = safeParseJson(record.relevance_details)
+  const accDetails = safeParseJson(record.accuracy_details)
+  const halDetails = safeParseJson(record.hallucination_details)
+  const compDetails = safeParseJson(record.completeness_details)
+
+  const relAlignPoints = safeList(relDetails.key_alignment_points)
+  const relMissedPoints = safeList(relDetails.missed_aspects)
+  const accVerifiedClaims = safeList(accDetails.verified_claims)
+  const accCitations = safeList(accDetails.evidence_citations)
+  const halFlaggedClaims = safeList(halDetails.flagged_claims)
+  const compAddressed = safeList(compDetails.addressed_aspects)
+  const compMissing = safeList(compDetails.missing_aspects)
+
+  const finalVerdict = record.final_verdict || 'Unverified'
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-dialog-large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header flex-between">
+          <div>
+            <span className="modal-tag">Record #{record.row_index || record.id} Details</span>
+            <h3 className="modal-title">Multi-Agent Evaluation Breakdown</h3>
+          </div>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="modal-body-scroll">
+          <div className="modal-section-card">
+            <div className="qa-pair-box">
+              <div className="qa-row">
+                <span className="qa-label">Question:</span>
+                <p className="qa-content">{record.question || '—'}</p>
+              </div>
+              <div className="qa-row">
+                <span className="qa-label">AI Response:</span>
+                <p className="qa-content">{record.ai_response || '—'}</p>
+              </div>
+              {record.reference_answer && (
+                <div className="qa-row">
+                  <span className="qa-label">Reference Ground Truth:</span>
+                  <p className="qa-content text-accent">{record.reference_answer}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={`verdict-banner ${
+            finalVerdict === 'Pass'
+              ? 'verdict-banner-pass'
+              : finalVerdict === 'Needs Improvement'
+              ? 'verdict-banner-moderate'
+              : finalVerdict === 'Unverified'
+              ? 'verdict-banner-unverified'
+              : 'verdict-banner-fail'
+          }`}>
+            <div className="verdict-banner-left">
+              <div className="verdict-icon-wrapper">
+                {finalVerdict === 'Pass' ? (
+                  <CheckCircle2 size={24} />
+                ) : finalVerdict === 'Needs Improvement' ? (
+                  <AlertTriangle size={24} />
+                ) : finalVerdict === 'Unverified' ? (
+                  <HelpCircle size={24} />
+                ) : (
+                  <XCircle size={24} />
+                )}
+              </div>
+              <div>
+                <div className="verdict-label-row">
+                  <span className="verdict-status-title">FINAL VERDICT: {finalVerdict}</span>
+                  {record.source_conflict_detected && (
+                    <span className="conflict-tag-pill">Conflict in Ground Truth</span>
+                  )}
+                </div>
+                <p className="verdict-summary-text">{record.verdict_summary || 'Evaluation completed across all 4 dimensions.'}</p>
+              </div>
+            </div>
+
+            <div className="verdict-banner-score">
+              <span className="composite-label">Weighted Score</span>
+              <span className="composite-number">{safeScore(record.composite_score, 2)}</span>
+              <span className="composite-max">/ 5.00</span>
+            </div>
+          </div>
+
+          <div className="agent-grid-2col modal-grid">
+            <div className={`agent-card ${getScoreColorClass(record.relevance_score)}`}>
+              <div className="agent-card-header">
+                <div className="agent-header-top">
+                  <div className="agent-name-group">
+                    <FileCheck size={16} />
+                    <h4>Relevance Judge</h4>
+                  </div>
+                  <span className="agent-score-pill">{safeScore(record.relevance_score, 1)} / 5.0</span>
+                </div>
+                {relDetails.relevance_category && (
+                  <span className="agent-sub-pill">{relDetails.relevance_category}</span>
+                )}
+              </div>
+              <p className="agent-reasoning">{record.relevance_reasoning || relDetails.reasoning || 'No specific reasoning provided.'}</p>
+
+              {relAlignPoints.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Key Alignment Points:</span>
+                  <ul className="agent-sub-list">
+                    {relAlignPoints.map((pt, i) => (
+                      <li key={i} className="agent-sub-item item-align">
+                        <span className="sub-bullet">✓</span>
+                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {relMissedPoints.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Missed / Ignored Aspects:</span>
+                  <ul className="agent-sub-list">
+                    {relMissedPoints.map((pt, i) => (
+                      <li key={i} className="agent-sub-item item-missed">
+                        <span className="sub-bullet">⚠</span>
+                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className={`agent-card ${getScoreColorClass(record.accuracy_score)}`}>
+              <div className="agent-card-header">
+                <div className="agent-header-top">
+                  <div className="agent-name-group">
+                    <ShieldCheck size={16} />
+                    <h4>Accuracy Judge</h4>
+                  </div>
+                  <span className="agent-score-pill">{safeScore(record.accuracy_score, 1)} / 5.0</span>
+                </div>
+                {accDetails.accuracy_category && (
+                  <span className="agent-sub-pill">{accDetails.accuracy_category}</span>
+                )}
+              </div>
+              <p className="agent-reasoning">{record.accuracy_reasoning || accDetails.reasoning || 'No specific reasoning provided.'}</p>
+
+              {accVerifiedClaims.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Verified Claims:</span>
+                  <ul className="agent-sub-list">
+                    {accVerifiedClaims.map((claim, i) => (
+                      <li key={i} className="agent-sub-item item-align">
+                        <span className="sub-bullet">✓</span>
+                        <span>{typeof claim === 'object' ? JSON.stringify(claim) : String(claim)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {accCitations.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Evidence Citations:</span>
+                  <ul className="agent-sub-list">
+                    {accCitations.map((cite, i) => (
+                      <li key={i} className="agent-sub-item item-citation">
+                        <span className="sub-bullet">🔗</span>
+                        <span>{typeof cite === 'object' ? JSON.stringify(cite) : String(cite)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className={`agent-card ${getScoreColorClass(record.hallucination_score)}`}>
+              <div className="agent-card-header">
+                <div className="agent-header-top">
+                  <div className="agent-name-group">
+                    <ShieldAlert size={16} />
+                    <h4>Hallucination Agent</h4>
+                  </div>
+                  <span className="agent-score-pill">{safeScore(record.hallucination_score, 1)} / 5.0</span>
+                </div>
+                {halDetails.hallucination_level && (
+                  <span className="agent-sub-pill">{halDetails.hallucination_level}</span>
+                )}
+              </div>
+              <p className="agent-reasoning">{record.hallucination_reasoning || halDetails.reasoning || 'No specific reasoning provided.'}</p>
+
+              {halFlaggedClaims.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Flagged Hallucinations:</span>
+                  <ul className="agent-sub-list">
+                    {halFlaggedClaims.map((claim, i) => (
+                      <li key={i} className="agent-sub-item item-hallucination">
+                        <span className="sub-bullet">⚠</span>
+                        <span>{typeof claim === 'object' ? JSON.stringify(claim) : String(claim)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className={`agent-card ${getScoreColorClass(record.completeness_score)}`}>
+              <div className="agent-card-header">
+                <div className="agent-header-top">
+                  <div className="agent-name-group">
+                    <Scale size={16} />
+                    <h4>Completeness Judge</h4>
+                  </div>
+                  <span className="agent-score-pill">{safeScore(record.completeness_score, 1)} / 5.0</span>
+                </div>
+                {compDetails.completeness_category && (
+                  <span className="agent-sub-pill">{compDetails.completeness_category}</span>
+                )}
+              </div>
+              <p className="agent-reasoning">{record.completeness_reasoning || compDetails.reasoning || 'No specific reasoning provided.'}</p>
+
+              {compAddressed.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Addressed Aspects:</span>
+                  <ul className="agent-sub-list">
+                    {compAddressed.map((pt, i) => (
+                      <li key={i} className="agent-sub-item item-align">
+                        <span className="sub-bullet">✓</span>
+                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {compMissing.length > 0 && (
+                <div className="agent-sub-section">
+                  <span className="agent-sub-title">Missing / Omitted Aspects:</span>
+                  <ul className="agent-sub-list">
+                    {compMissing.map((pt, i) => (
+                      <li key={i} className="agent-sub-item item-missed">
+                        <span className="sub-bullet">⚠</span>
+                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-footer flex-between">
+          <span className="modal-footer-note">Detailed multi-agent evaluation output</span>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={onClose}
+          >
+            <X size={14} />
+            <span>Close Inspection</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function BatchEvaluationModule() {
@@ -601,26 +956,26 @@ export default function BatchEvaluationModule() {
                         </td>
                         <td>
                           <span className={`score-badge ${getScorePillClass(rec.relevance_score)}`}>
-                            {rec.relevance_score?.toFixed(1)}
+                            {safeScore(rec.relevance_score, 1)}
                           </span>
                         </td>
                         <td>
                           <span className={`score-badge ${getScorePillClass(rec.accuracy_score)}`}>
-                            {rec.accuracy_score?.toFixed(1)}
+                            {safeScore(rec.accuracy_score, 1)}
                           </span>
                         </td>
                         <td>
                           <span className={`score-badge ${getScorePillClass(rec.hallucination_score)}`}>
-                            {rec.hallucination_score?.toFixed(1)}
+                            {safeScore(rec.hallucination_score, 1)}
                           </span>
                         </td>
                         <td>
                           <span className={`score-badge ${getScorePillClass(rec.completeness_score)}`}>
-                            {rec.completeness_score?.toFixed(1)}
+                            {safeScore(rec.completeness_score, 1)}
                           </span>
                         </td>
                         <td>
-                          <strong className="overall-score-txt">{rec.composite_score?.toFixed(2)}</strong>
+                          <strong className="overall-score-txt">{safeScore(rec.composite_score, 2)}</strong>
                         </td>
                         <td>
                           <div className="verdict-col-group">
@@ -689,259 +1044,9 @@ export default function BatchEvaluationModule() {
       )}
 
       {selectedRecord && (
-        <div className="modal-overlay" onClick={() => setSelectedRecord(null)}>
-          <div className="modal-dialog-large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header flex-between">
-              <div>
-                <span className="modal-tag">Record #{selectedRecord.row_index || selectedRecord.id} Details</span>
-                <h3 className="modal-title">Multi-Agent Evaluation Breakdown</h3>
-              </div>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => setSelectedRecord(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body-scroll">
-              <div className="modal-section-card">
-                <div className="qa-pair-box">
-                  <div className="qa-row">
-                    <span className="qa-label">Question:</span>
-                    <p className="qa-content">{selectedRecord.question}</p>
-                  </div>
-                  <div className="qa-row">
-                    <span className="qa-label">AI Response:</span>
-                    <p className="qa-content">{selectedRecord.ai_response}</p>
-                  </div>
-                  {selectedRecord.reference_answer && (
-                    <div className="qa-row">
-                      <span className="qa-label">Reference Ground Truth:</span>
-                      <p className="qa-content text-accent">{selectedRecord.reference_answer}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={`verdict-banner ${
-                selectedRecord.final_verdict === 'Pass'
-                  ? 'verdict-banner-pass'
-                  : selectedRecord.final_verdict === 'Needs Improvement'
-                  ? 'verdict-banner-moderate'
-                  : selectedRecord.final_verdict === 'Unverified'
-                  ? 'verdict-banner-unverified'
-                  : 'verdict-banner-fail'
-              }`}>
-                <div className="verdict-banner-left">
-                  <div className="verdict-icon-wrapper">
-                    {selectedRecord.final_verdict === 'Pass' ? (
-                      <CheckCircle2 size={24} />
-                    ) : selectedRecord.final_verdict === 'Needs Improvement' ? (
-                      <AlertTriangle size={24} />
-                    ) : selectedRecord.final_verdict === 'Unverified' ? (
-                      <HelpCircle size={24} />
-                    ) : (
-                      <XCircle size={24} />
-                    )}
-                  </div>
-                  <div>
-                    <div className="verdict-label-row">
-                      <span className="verdict-status-title">FINAL VERDICT: {selectedRecord.final_verdict}</span>
-                      {selectedRecord.source_conflict_detected && (
-                        <span className="conflict-tag-pill">Conflict in Ground Truth</span>
-                      )}
-                    </div>
-                    <p className="verdict-summary-text">{selectedRecord.verdict_summary}</p>
-                  </div>
-                </div>
-
-                <div className="verdict-banner-score">
-                  <span className="composite-label">Weighted Score</span>
-                  <span className="composite-number">{selectedRecord.composite_score?.toFixed(2)}</span>
-                  <span className="composite-max">/ 5.00</span>
-                </div>
-              </div>
-
-              <div className="agent-grid-2col modal-grid">
-                <div className={`agent-card ${getScoreColorClass(selectedRecord.relevance_score)}`}>
-                  <div className="agent-card-header">
-                    <div className="agent-header-top">
-                      <div className="agent-name-group">
-                        <FileCheck size={16} />
-                        <h4>Relevance Judge</h4>
-                      </div>
-                      <span className="agent-score-pill">{selectedRecord.relevance_score?.toFixed(1)} / 5.0</span>
-                    </div>
-                    {selectedRecord.relevance_details?.relevance_category && (
-                      <span className="agent-sub-pill">{selectedRecord.relevance_details.relevance_category}</span>
-                    )}
-                  </div>
-                  <p className="agent-reasoning">{selectedRecord.relevance_reasoning}</p>
-
-                  {selectedRecord.relevance_details?.key_alignment_points && selectedRecord.relevance_details.key_alignment_points.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Key Alignment Points:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.relevance_details.key_alignment_points.map((pt, i) => (
-                          <li key={i} className="agent-sub-item item-align">
-                            <span className="sub-bullet">✓</span>
-                            <span>{pt}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {selectedRecord.relevance_details?.missed_aspects && selectedRecord.relevance_details.missed_aspects.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Missed / Ignored Aspects:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.relevance_details.missed_aspects.map((pt, i) => (
-                          <li key={i} className="agent-sub-item item-missed">
-                            <span className="sub-bullet">⚠</span>
-                            <span>{pt}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                <div className={`agent-card ${getScoreColorClass(selectedRecord.accuracy_score)}`}>
-                  <div className="agent-card-header">
-                    <div className="agent-header-top">
-                      <div className="agent-name-group">
-                        <ShieldCheck size={16} />
-                        <h4>Accuracy Judge</h4>
-                      </div>
-                      <span className="agent-score-pill">{selectedRecord.accuracy_score?.toFixed(1)} / 5.0</span>
-                    </div>
-                    {selectedRecord.accuracy_details?.accuracy_category && (
-                      <span className="agent-sub-pill">{selectedRecord.accuracy_details.accuracy_category}</span>
-                    )}
-                  </div>
-                  <p className="agent-reasoning">{selectedRecord.accuracy_reasoning}</p>
-
-                  {selectedRecord.accuracy_details?.verified_claims && selectedRecord.accuracy_details.verified_claims.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Verified Claims:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.accuracy_details.verified_claims.map((claim, i) => (
-                          <li key={i} className="agent-sub-item item-align">
-                            <span className="sub-bullet">✓</span>
-                            <span>{claim}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {selectedRecord.accuracy_details?.evidence_citations && selectedRecord.accuracy_details.evidence_citations.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Evidence Citations:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.accuracy_details.evidence_citations.map((cite, i) => (
-                          <li key={i} className="agent-sub-item item-citation">
-                            <span className="sub-bullet">🔗</span>
-                            <span>{cite}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                <div className={`agent-card ${getScoreColorClass(selectedRecord.hallucination_score)}`}>
-                  <div className="agent-card-header">
-                    <div className="agent-header-top">
-                      <div className="agent-name-group">
-                        <ShieldAlert size={16} />
-                        <h4>Hallucination Agent</h4>
-                      </div>
-                      <span className="agent-score-pill">{selectedRecord.hallucination_score?.toFixed(1)} / 5.0</span>
-                    </div>
-                    {selectedRecord.hallucination_details?.hallucination_level && (
-                      <span className="agent-sub-pill">{selectedRecord.hallucination_details.hallucination_level}</span>
-                    )}
-                  </div>
-                  <p className="agent-reasoning">{selectedRecord.hallucination_reasoning}</p>
-
-                  {selectedRecord.hallucination_details?.flagged_claims && selectedRecord.hallucination_details.flagged_claims.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Flagged Hallucinations:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.hallucination_details.flagged_claims.map((claim, i) => (
-                          <li key={i} className="agent-sub-item item-hallucination">
-                            <span className="sub-bullet">⚠</span>
-                            <span>{claim}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                <div className={`agent-card ${getScoreColorClass(selectedRecord.completeness_score)}`}>
-                  <div className="agent-card-header">
-                    <div className="agent-header-top">
-                      <div className="agent-name-group">
-                        <Scale size={16} />
-                        <h4>Completeness Judge</h4>
-                      </div>
-                      <span className="agent-score-pill">{selectedRecord.completeness_score?.toFixed(1)} / 5.0</span>
-                    </div>
-                    {selectedRecord.completeness_details?.completeness_category && (
-                      <span className="agent-sub-pill">{selectedRecord.completeness_details.completeness_category}</span>
-                    )}
-                  </div>
-                  <p className="agent-reasoning">{selectedRecord.completeness_reasoning}</p>
-
-                  {selectedRecord.completeness_details?.addressed_aspects && selectedRecord.completeness_details.addressed_aspects.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Addressed Aspects:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.completeness_details.addressed_aspects.map((pt, i) => (
-                          <li key={i} className="agent-sub-item item-align">
-                            <span className="sub-bullet">✓</span>
-                            <span>{pt}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {selectedRecord.completeness_details?.missing_aspects && selectedRecord.completeness_details.missing_aspects.length > 0 && (
-                    <div className="agent-sub-section">
-                      <span className="agent-sub-title">Missing / Omitted Aspects:</span>
-                      <ul className="agent-sub-list">
-                        {selectedRecord.completeness_details.missing_aspects.map((pt, i) => (
-                          <li key={i} className="agent-sub-item item-missed">
-                            <span className="sub-bullet">⚠</span>
-                            <span>{pt}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer flex-between">
-              <span className="modal-footer-note">Detailed multi-agent evaluation output</span>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setSelectedRecord(null)}
-              >
-                <X size={14} />
-                <span>Close Inspection</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <InspectErrorBoundary onClose={() => setSelectedRecord(null)}>
+          <InspectModal record={selectedRecord} onClose={() => setSelectedRecord(null)} />
+        </InspectErrorBoundary>
       )}
     </div>
   )

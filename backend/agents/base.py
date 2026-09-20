@@ -11,11 +11,12 @@ from google.api_core import client_options as client_options_lib
 env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
 load_dotenv(env_path)
 
-PRIMARY_MODEL = "gemini-3.6-flash"
+PRIMARY_MODEL = "gemini-3.1-flash-lite"
 FALLBACK_MODELS = [
-    "gemini-3.7-flash",
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",
+    "gemini-3.6-flash",
 ]
 
 _api_keys = []

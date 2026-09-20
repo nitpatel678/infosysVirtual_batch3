@@ -313,7 +313,33 @@ def get_batch_records(batch_id):
                 ORDER BY id ASC;
             """, (batch_id,))
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            results = []
+            json_cols = [
+                "relevance_details",
+                "accuracy_details",
+                "hallucination_details",
+                "completeness_details",
+                "verdict_details"
+            ]
+            for r in rows:
+                rec = dict(r)
+                for col in json_cols:
+                    val = rec.get(col)
+                    if isinstance(val, str):
+                        try:
+                            rec[col] = json.loads(val)
+                        except Exception:
+                            rec[col] = {}
+                    elif val is None:
+                        rec[col] = {}
+                for score_col in ["relevance_score", "accuracy_score", "hallucination_score", "completeness_score", "composite_score"]:
+                    if rec.get(score_col) is not None:
+                        try:
+                            rec[score_col] = float(rec[score_col])
+                        except Exception:
+                            rec[score_col] = 1.0
+                results.append(rec)
+            return results
     finally:
         conn.close()
 
