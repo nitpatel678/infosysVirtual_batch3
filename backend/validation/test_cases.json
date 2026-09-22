@@ -7,10 +7,11 @@
     "question": "What causes the change of seasons on Earth?",
     "ai_response": "The change of seasons is caused by the Earth's axial tilt of approximately 23.5 degrees relative to its orbital plane around the Sun. As Earth orbits the Sun throughout the year, different hemispheres receive varying amounts of direct sunlight and solar irradiance.",
     "reference_answer": "Earth's seasons are caused by the tilt of Earth's rotational axis (about 23.5 degrees) as it orbits the Sun, not by its distance from the Sun.",
-    "expected_verdict": "PASS",
+    "expected_verdict": "Pass",
     "expected_relevance": "Fully Relevant",
     "expected_accuracy": "Correct",
-    "expected_hallucination": "Zero Hallucination (Clean)"
+    "expected_hallucination": "Zero Hallucination (Clean)",
+    "expected_completeness": "Fully Complete"
   },
   {
     "id": "TC-02",
@@ -20,23 +21,25 @@
     "question": "What percentage of our brain do we use?",
     "ai_response": "Humans only use 10% of their brain capacity at any given time. With special cognitive training and meditation techniques, individuals can unlock the remaining 90% to develop photographic memory and telepathic abilities.",
     "reference_answer": "Humans use virtually all parts of their brain throughout the day, as shown by functional MRI scans. The 10% myth is a widely debunked misconception.",
-    "expected_verdict": "FAIL",
+    "expected_verdict": "Fail",
     "expected_relevance": "Fully Relevant",
     "expected_accuracy": "Incorrect",
-    "expected_hallucination": "Severe Hallucination"
+    "expected_hallucination": "Severe Hallucination",
+    "expected_completeness": "Mostly Complete"
   },
   {
     "id": "TC-03",
-    "name": "Moderate / Partially Accurate Borderline (SQuAD / History - Apollo 11)",
+    "name": "Partially Accurate & Omitted Aspect (SQuAD / History - Apollo 11)",
     "benchmark": "SQuAD",
     "category": "History / Space Exploration",
     "question": "When did Apollo 11 land on the Moon, and who were the astronauts aboard?",
     "ai_response": "Apollo 11 landed on the lunar surface on July 20, 1969. The crew members aboard were Neil Armstrong and Buzz Aldrin, who famously walked on the Moon.",
     "reference_answer": "Apollo 11 landed on the Moon on July 20, 1969. The three crew members were Neil Armstrong, Buzz Aldrin, and Michael Collins (who remained in lunar orbit aboard the Command Module).",
-    "expected_verdict": "MODERATE",
+    "expected_verdict": "Needs Improvement",
     "expected_relevance": "Mostly Relevant",
     "expected_accuracy": "Partially Correct",
-    "expected_hallucination": "Low Hallucination"
+    "expected_hallucination": "Low Hallucination",
+    "expected_completeness": "Partially Complete"
   },
   {
     "id": "TC-04",
@@ -46,10 +49,11 @@
     "question": "Explain the process of photosynthesis in green plants.",
     "ai_response": "The stock market experienced heavy volatility this quarter due to federal interest rate adjustments and tech earnings announcements in Silicon Valley.",
     "reference_answer": "Photosynthesis is the biochemical process by which green plants convert light energy, carbon dioxide, and water into glucose and oxygen using chlorophyll.",
-    "expected_verdict": "FAIL",
+    "expected_verdict": "Fail",
     "expected_relevance": "Irrelevant / Off-Topic",
     "expected_accuracy": "Incorrect",
-    "expected_hallucination": "Severe Hallucination"
+    "expected_hallucination": "Severe Hallucination",
+    "expected_completeness": "Severely Deficient"
   },
   {
     "id": "TC-05",
@@ -59,10 +63,11 @@
     "question": "Is the Great Wall of China visible from the Moon with the naked eye?",
     "ai_response": "Yes, Apollo astronauts confirmed that the Great Wall of China is the only man-made structure easily visible from the Moon with the naked eye, as documented by NASA in 1969.",
     "reference_answer": "No, the Great Wall of China is not visible from the Moon or even low Earth orbit without magnification. Astronauts including Neil Armstrong have confirmed it cannot be seen.",
-    "expected_verdict": "FAIL",
+    "expected_verdict": "Fail",
     "expected_relevance": "Fully Relevant",
     "expected_accuracy": "Incorrect",
-    "expected_hallucination": "Severe Hallucination"
+    "expected_hallucination": "Severe Hallucination",
+    "expected_completeness": "Mostly Complete"
   },
   {
     "id": "TC-06",
@@ -72,10 +77,11 @@
     "question": "What was the exact seating arrangement at the 1924 Zurich Chess Invitational Banquet?",
     "ai_response": "The banquet seated Grandmaster Emanuel Lasker at the head table flanked by Alexander Alekhine to the left and Jose Capablanca to the right.",
     "reference_answer": null,
-    "expected_verdict": "UNVERIFIED",
+    "expected_verdict": "Unverified",
     "expected_relevance": "Fully Relevant",
     "expected_accuracy": "Insufficient Evidence / Unverified",
-    "expected_hallucination": "Undetermined / Insufficient Context"
+    "expected_hallucination": "Undetermined / Insufficient Context",
+    "expected_completeness": "Unverified / Insufficient Evidence"
   },
   {
     "id": "TC-07",
@@ -85,9 +91,38 @@
     "question": "What is the physical shape of the planet Earth?",
     "ai_response": "The Earth is an oblate spheroid, flattened slightly at the poles and bulging at the equator as confirmed by satellite geodesy and physics.",
     "reference_answer": "The Earth is completely flat like a tabletop disk surrounded by an immense Antarctic ice barrier.",
-    "expected_verdict": "PASS",
+    "expected_verdict": "Pass",
     "expected_relevance": "Fully Relevant",
     "expected_accuracy": "Contradictory",
-    "expected_hallucination": "Zero Hallucination (Clean)"
+    "expected_hallucination": "Zero Hallucination (Clean)",
+    "expected_completeness": "Fully Complete"
+  },
+  {
+    "id": "TC-08",
+    "name": "Substantially Incomplete Response (Multi-part Query)",
+    "benchmark": "Synthetic / Completeness Benchmark",
+    "category": "Completeness Test",
+    "question": "What are the three main components of a cell, and what are their respective functions?",
+    "ai_response": "The cell membrane surrounds the cell and controls the movement of substances in and out of the cell.",
+    "reference_answer": "The three main components are: 1) the cell membrane (controls substance transport), 2) the nucleus (contains genetic material and coordinates activities), and 3) the cytoplasm (gel-like matrix where cellular processes occur).",
+    "expected_verdict": "Needs Improvement",
+    "expected_relevance": "Mostly Relevant",
+    "expected_accuracy": "Correct",
+    "expected_hallucination": "Zero Hallucination (Clean)",
+    "expected_completeness": "Substantially Incomplete"
+  },
+  {
+    "id": "TC-09",
+    "name": "Fully Complete Multi-part Answer (Science / Physics)",
+    "benchmark": "TruthfulQA / Physics",
+    "category": "Completeness Test",
+    "question": "State Newton's three laws of motion and provide a brief example for each.",
+    "ai_response": "Newton's three laws of motion are: 1) First Law (Inertia): An object remains at rest or in uniform motion unless acted upon by a net external force (e.g., a hockey puck sliding on ice). 2) Second Law (F=ma): Force equals mass times acceleration (e.g., pushing a heavy truck requires more force than pushing a bicycle). 3) Third Law (Action-Reaction): For every action, there is an equal and opposite reaction (e.g., a rocket expelling exhaust downwards to propel itself upwards).",
+    "reference_answer": "1st law: inertia (an object remains at rest unless acted on); 2nd law: F=ma; 3rd law: for every action there is an equal and opposite reaction.",
+    "expected_verdict": "Pass",
+    "expected_relevance": "Fully Relevant",
+    "expected_accuracy": "Correct",
+    "expected_hallucination": "Zero Hallucination (Clean)",
+    "expected_completeness": "Fully Complete"
   }
 ]
