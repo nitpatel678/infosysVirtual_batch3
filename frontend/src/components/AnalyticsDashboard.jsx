@@ -144,9 +144,9 @@ export default function AnalyticsDashboard() {
   const donutSegments = rawDonutSegments.filter((s) => s.count > 0)
 
   const donutCx = 140
-  const donutCy = 130
-  const donutRo = 85
-  const donutRi = 56
+  const donutCy = 140
+  const donutRo = 106
+  const donutRi = 70
 
   let cumulativeAngle = -Math.PI / 2
   const donutArcs = donutSegments.map((seg, idx) => {
@@ -174,45 +174,49 @@ export default function AnalyticsDashboard() {
   })
 
   // Radar chart calculations
-  const radarCx = 195
-  const radarCy = 135
-  const radarRadius = 78
+  const radarCx = 210
+  const radarCy = 155
+  const radarRadius = 92
 
   const radarDimensions = [
     {
       key: 'relevance',
       name: 'Relevance',
       score: Number(avgs.relevance || 0),
+      scoreColor: '#38bdf8',
       angle: -Math.PI / 2,
-      labelX: 195,
-      labelY: 18,
+      labelX: 210,
+      labelY: 26,
       textAnchor: 'middle',
     },
     {
       key: 'accuracy',
       name: 'Accuracy',
       score: Number(avgs.accuracy || 0),
+      scoreColor: '#34d399',
       angle: 0,
-      labelX: 282,
-      labelY: 139,
+      labelX: 322,
+      labelY: 151,
       textAnchor: 'start',
     },
     {
       key: 'hallucination',
       name: 'Hallucination Res.',
       score: Number(avgs.hallucination || 0),
+      scoreColor: '#a855f7',
       angle: Math.PI / 2,
-      labelX: 195,
-      labelY: 258,
+      labelX: 210,
+      labelY: 278,
       textAnchor: 'middle',
     },
     {
       key: 'completeness',
       name: 'Completeness',
       score: Number(avgs.completeness || 0),
+      scoreColor: '#fbbf24',
       angle: Math.PI,
-      labelX: 108,
-      labelY: 139,
+      labelX: 98,
+      labelY: 151,
       textAnchor: 'end',
     },
   ]
@@ -873,20 +877,20 @@ export default function AnalyticsDashboard() {
             <div className="analytics-graph-card radar-card">
               <div className="card-header flex-between">
                 <div>
-                  <div className="flex-align-center">
+                  <div className="flex-align-center gap-2">
                     <Target size={16} className="text-accent" />
-                    <h4>Multi-Agent Quality Radar (Dimension Balance)</h4>
+                    <h4>Multi-Agent Quality Radar</h4>
                   </div>
                   <p className="card-subtitle">
-                    Cross-dimensional balance across all 4 evaluation agents vs benchmark target
+                    Cross-dimensional balance across all 4 evaluation agents vs target
                   </p>
                 </div>
-                <div className="chart-legend-row">
-                  <div className="legend-item">
+                <div className="chart-legend-row header-legend-pills">
+                  <div className="legend-item pill-legend">
                     <span className="legend-dot dot-radar-actual" />
-                    <span>System Average</span>
+                    <span>System Avg</span>
                   </div>
-                  <div className="legend-item">
+                  <div className="legend-item pill-legend">
                     <span className="legend-line line-threshold" />
                     <span>Target (5.0)</span>
                   </div>
@@ -895,12 +899,12 @@ export default function AnalyticsDashboard() {
 
               <div className="radar-layout-body">
                 <div className="radar-svg-wrapper">
-                  <svg viewBox="0 0 390 270" className="radar-svg">
+                  <svg viewBox="0 0 420 310" className="radar-svg">
                     <defs>
                       <radialGradient id="radarAreaGrad" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.5" />
-                        <stop offset="60%" stopColor="#6366f1" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#818cf8" stopOpacity="0.1" />
+                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
+                        <stop offset="60%" stopColor="#6366f1" stopOpacity="0.38" />
+                        <stop offset="100%" stopColor="#818cf8" stopOpacity="0.12" />
                       </radialGradient>
                     </defs>
 
@@ -916,15 +920,16 @@ export default function AnalyticsDashboard() {
                           <polygon
                             points={`${p0} ${p1} ${p2} ${p3}`}
                             fill="none"
-                            stroke="rgba(255, 255, 255, 0.08)"
+                            stroke="rgba(255, 255, 255, 0.1)"
                             strokeWidth={level === 1.0 ? '1.5' : '1'}
-                            strokeDasharray={level === 1.0 ? '3,3' : 'none'}
+                            strokeDasharray={level === 1.0 ? '4,4' : 'none'}
                           />
                           <text
                             x={radarCx + 4}
-                            y={radarCy - r + 9}
+                            y={radarCy - r + 11}
                             fill="#64748b"
-                            fontSize="8"
+                            fontSize="9.5"
+                            fontWeight="600"
                           >
                             {(level * 5).toFixed(1)}
                           </text>
@@ -943,8 +948,8 @@ export default function AnalyticsDashboard() {
                           y1={radarCy}
                           x2={ax}
                           y2={ay}
-                          stroke="rgba(255, 255, 255, 0.12)"
-                          strokeWidth="1"
+                          stroke="rgba(255, 255, 255, 0.14)"
+                          strokeWidth="1.2"
                         />
                       )
                     })}
@@ -954,13 +959,13 @@ export default function AnalyticsDashboard() {
                       <path
                         d={radarPathD}
                         fill="url(#radarAreaGrad)"
-                        stroke="#6366f1"
+                        stroke="#818cf8"
                         strokeWidth="2.5"
                         strokeLinejoin="round"
                       />
                     )}
 
-                    {/* Vertex nodes */}
+                    {/* Vertex nodes & Dimension Badges */}
                     {radarPolygonPoints.map((pt, i) => {
                       const isHovered = hoveredRadarAxis === pt.key
                       return (
@@ -968,10 +973,10 @@ export default function AnalyticsDashboard() {
                           <circle
                             cx={pt.x}
                             cy={pt.y}
-                            r={isHovered ? 6 : 4.5}
+                            r={isHovered ? 7 : 5}
                             fill="#38bdf8"
                             stroke="#0f172a"
-                            strokeWidth={2}
+                            strokeWidth={2.5}
                             style={{ cursor: 'pointer', transition: 'r 0.15s ease' }}
                             onMouseEnter={() => setHoveredRadarAxis(pt.key)}
                             onMouseLeave={() => setHoveredRadarAxis(null)}
@@ -979,13 +984,22 @@ export default function AnalyticsDashboard() {
                           <text
                             x={pt.labelX}
                             y={pt.labelY}
-                            fill={isHovered ? '#38bdf8' : '#cbd5e1'}
-                            fontSize="9"
+                            fill="#f8fafc"
+                            fontSize="12.5"
+                            fontWeight="700"
+                            textAnchor={pt.textAnchor}
+                          >
+                            {pt.name}
+                          </text>
+                          <text
+                            x={pt.labelX}
+                            y={pt.labelY + 16}
+                            fill={isHovered ? '#38bdf8' : pt.scoreColor}
+                            fontSize="11.5"
                             fontWeight="600"
                             textAnchor={pt.textAnchor}
-                            style={{ transition: 'fill 0.15s ease' }}
                           >
-                            {pt.name}: {pt.score.toFixed(2)}
+                            {pt.score.toFixed(2)} / 5.0
                           </text>
                         </g>
                       )
@@ -1017,12 +1031,12 @@ export default function AnalyticsDashboard() {
             <div className="analytics-graph-card donut-card">
               <div className="card-header flex-between">
                 <div>
-                  <div className="flex-align-center">
+                  <div className="flex-align-center gap-2">
                     <PieChart size={16} className="text-accent" />
-                    <h4>Verdict Quality Distribution & Health</h4>
+                    <h4>Verdict Distribution & Health</h4>
                   </div>
                   <p className="card-subtitle">
-                    Proportional breakdown of validated submissions by final verdict status
+                    Proportional breakdown of validated submissions
                   </p>
                 </div>
                 <span className="donut-badge-total">{donutTotal} Records</span>
@@ -1033,7 +1047,7 @@ export default function AnalyticsDashboard() {
                   {donutTotal === 0 ? (
                     <div className="no-data-hint">No evaluation data available</div>
                   ) : (
-                    <svg viewBox="0 0 280 260" className="donut-svg">
+                    <svg viewBox="0 0 280 280" className="donut-svg">
                       {donutArcs.map((arc, i) => {
                         const isHovered = hoveredDonutIndex === i
                         return (
@@ -1043,7 +1057,7 @@ export default function AnalyticsDashboard() {
                             fill={arc.color}
                             opacity={hoveredDonutIndex === null || isHovered ? 1 : 0.4}
                             stroke="#0f172a"
-                            strokeWidth="2"
+                            strokeWidth="2.5"
                             style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
                             onMouseEnter={() => setHoveredDonutIndex(i)}
                             onMouseLeave={() => setHoveredDonutIndex(null)}
@@ -1054,9 +1068,9 @@ export default function AnalyticsDashboard() {
                       {/* Center Cutout Content */}
                       <text
                         x={donutCx}
-                        y={donutCy - 6}
+                        y={donutCy - 2}
                         fill="#f8fafc"
-                        fontSize="22"
+                        fontSize="32"
                         fontWeight="800"
                         textAnchor="middle"
                       >
@@ -1064,24 +1078,14 @@ export default function AnalyticsDashboard() {
                       </text>
                       <text
                         x={donutCx}
-                        y={donutCy + 12}
+                        y={donutCy + 18}
                         fill="#94a3b8"
-                        fontSize="8.5"
+                        fontSize="10"
                         fontWeight="700"
-                        letterSpacing="0.8"
+                        letterSpacing="1.2"
                         textAnchor="middle"
                       >
                         PASS RATE
-                      </text>
-                      <text
-                        x={donutCx}
-                        y={donutCy + 27}
-                        fill={rates.pass_rate >= 70 ? '#4ade80' : '#facc15'}
-                        fontSize="8"
-                        fontWeight="600"
-                        textAnchor="middle"
-                      >
-                        {rates.pass_rate >= 70 ? '● HEALTHY' : '● CALIBRATE'}
                       </text>
                     </svg>
                   )}
@@ -1099,12 +1103,12 @@ export default function AnalyticsDashboard() {
                         onMouseEnter={() => setHoveredDonutIndex(i)}
                         onMouseLeave={() => setHoveredDonutIndex(null)}
                       >
-                        <div className="flex-align-center gap-2">
+                        <div className="donut-legend-left">
                           <span
                             className="donut-legend-dot"
                             style={{ background: seg.color }}
                           />
-                          <div>
+                          <div className="donut-legend-text">
                             <span className="donut-seg-label">{seg.label}</span>
                             <span className="donut-seg-desc">{seg.desc}</span>
                           </div>
