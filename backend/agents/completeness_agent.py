@@ -32,7 +32,7 @@ Return JSON:
 }}
 """
         try:
-            reqs_data = generate_with_fallback(prompt_reqs)
+            reqs_data = generate_with_fallback(prompt_reqs, preferred_model="gemini-3.5-flash-lite")
             reqs = reqs_data.get("requirements", [question])
         except Exception:
             reqs = [question]
@@ -116,7 +116,7 @@ Return ONLY a JSON object strictly matching this schema:
   "reasoning": "Detailed justification explaining why information is considered complete, partially complete, or missing, citing specific requirements."
 }}
 """
-    result = generate_with_fallback(prompt)
+    result = generate_with_fallback(prompt, preferred_model="gemini-3.5-flash-lite")
     score = float(result.get("score", 3.0))
     score = min(5.0, max(1.0, score))
 

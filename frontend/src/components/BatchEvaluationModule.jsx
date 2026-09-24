@@ -19,6 +19,7 @@ import {
   X,
   ArrowRight,
   ExternalLink,
+  FileDown,
 } from 'lucide-react'
 
 function safeNum(val, fallback = 0) {
@@ -76,6 +77,23 @@ function getScoreColorClass(score) {
   if (s >= 4.0) return 'agent-good'
   if (s >= 3.0) return 'agent-moderate'
   return 'agent-poor'
+}
+
+function formatAspectText(item) {
+  if (!item) return ''
+  if (typeof item === 'string') return item
+  if (typeof item === 'object') {
+    if (item.aspect && item.explanation) return `${item.aspect}: ${item.explanation}`
+    if (item.aspect) return item.aspect
+    if (item.point) return item.point
+    if (item.description) return item.description
+    if (item.reasoning) return item.reasoning
+    if (item.statement) return item.statement
+    if (item.claim) return item.claim
+    const vals = Object.values(item).filter(v => typeof v === 'string' && v.trim())
+    if (vals.length > 0) return vals.join(' — ')
+  }
+  return String(item)
 }
 
 class InspectErrorBoundary extends React.Component {
@@ -238,7 +256,7 @@ function InspectModal({ record, onClose }) {
                     {relAlignPoints.map((pt, i) => (
                       <li key={i} className="agent-sub-item item-align">
                         <span className="sub-bullet">✓</span>
-                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                        <span>{formatAspectText(pt)}</span>
                       </li>
                     ))}
                   </ul>
@@ -252,7 +270,7 @@ function InspectModal({ record, onClose }) {
                     {relMissedPoints.map((pt, i) => (
                       <li key={i} className="agent-sub-item item-missed">
                         <span className="sub-bullet">⚠</span>
-                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                        <span>{formatAspectText(pt)}</span>
                       </li>
                     ))}
                   </ul>
@@ -277,29 +295,53 @@ function InspectModal({ record, onClose }) {
 
               {accVerifiedClaims.length > 0 && (
                 <div className="agent-sub-section">
-                  <span className="agent-sub-title">Verified Claims:</span>
-                  <ul className="agent-sub-list">
-                    {accVerifiedClaims.map((claim, i) => (
-                      <li key={i} className="agent-sub-item item-align">
-                        <span className="sub-bullet">✓</span>
-                        <span>{typeof claim === 'object' ? JSON.stringify(claim) : String(claim)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <span className="agent-sub-title">Verified Claims ({accVerifiedClaims.length}):</span>
+                  <div className="modal-claims-list">
+                    {accVerifiedClaims.map((claim, i) => {
+                      if (typeof claim === 'string') {
+                        return (
+                          <div key={i} className="modal-claim-card">
+                            <div className="modal-claim-header">
+                              <span className="claim-badge badge-supported">Verified</span>
+                            </div>
+                            <p className="claim-text">"{claim}"</p>
+                          </div>
+                        )
+                      }
+                      const verdict = claim.verdict || (claim.is_verified ? 'Verified' : 'Supported')
+                      const badgeClass = (verdict || 'supported').toLowerCase().replace(/\s+/g, '-')
+                      const claimText = claim.claim || claim.statement || claim.claim_text || 'Factual assertion'
+                      const source = claim.evidence_source || claim.source || claim.evidence_ref
+                      return (
+                        <div key={i} className="modal-claim-card">
+                          <div className="modal-claim-header">
+                            <span className={`claim-badge badge-${badgeClass}`}>{verdict}</span>
+                            {source && source !== 'None' && (
+                              <span className="claim-src" title={source}>Source: {source}</span>
+                            )}
+                          </div>
+                          <p className="claim-text">"{claimText}"</p>
+                          {claim.explanation && (
+                            <p className="claim-expl">{claim.explanation}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
               {accCitations.length > 0 && (
                 <div className="agent-sub-section">
                   <span className="agent-sub-title">Evidence Citations:</span>
-                  <ul className="agent-sub-list">
+                  <div className="modal-citations-list">
                     {accCitations.map((cite, i) => (
-                      <li key={i} className="agent-sub-item item-citation">
-                        <span className="sub-bullet">🔗</span>
-                        <span>{typeof cite === 'object' ? JSON.stringify(cite) : String(cite)}</span>
-                      </li>
+                      <div key={i} className="modal-citation-badge">
+                        <span>🔗</span>
+                        <span>{formatAspectText(cite)}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
             </div>
@@ -321,15 +363,42 @@ function InspectModal({ record, onClose }) {
 
               {halFlaggedClaims.length > 0 && (
                 <div className="agent-sub-section">
-                  <span className="agent-sub-title">Flagged Hallucinations:</span>
-                  <ul className="agent-sub-list">
-                    {halFlaggedClaims.map((claim, i) => (
-                      <li key={i} className="agent-sub-item item-hallucination">
-                        <span className="sub-bullet">⚠</span>
-                        <span>{typeof claim === 'object' ? JSON.stringify(claim) : String(claim)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <span className="agent-sub-title">Statement-by-Statement Audit ({halFlaggedClaims.length}):</span>
+                  <div className="modal-claims-list">
+                    {halFlaggedClaims.map((claim, i) => {
+                      if (typeof claim === 'string') {
+                        return (
+                          <div key={i} className="modal-claim-card claim-flagged">
+                            <div className="modal-claim-header">
+                              <span className="claim-badge badge-fabricated">Flagged</span>
+                            </div>
+                            <p className="claim-text">"{claim}"</p>
+                          </div>
+                        )
+                      }
+                      const status = claim.classification || claim.grounding_status || (claim.is_flagged ? 'Flagged' : 'Supported')
+                      const isFlagged = claim.is_flagged || ['unsupported', 'fabricated', 'contradictory', 'ungrounded', 'flagged'].includes(status.toLowerCase())
+                      const badgeClass = status.toLowerCase().replace(/\s+/g, '-')
+                      const claimText = claim.statement || claim.claim_text || claim.claim || 'Audit statement'
+                      const source = claim.evidence_ref || claim.evidence_source
+                      return (
+                        <div key={i} className={`modal-claim-card ${isFlagged ? 'claim-flagged' : ''}`}>
+                          <div className="modal-claim-header">
+                            <span className={`claim-badge badge-${badgeClass}`}>{status}</span>
+                            {source && source !== 'None' ? (
+                              <span className="claim-src" title={source}>Ref: {source}</span>
+                            ) : (
+                              <span className="claim-src text-muted">No Evidence</span>
+                            )}
+                          </div>
+                          <p className="claim-text">"{claimText}"</p>
+                          {claim.explanation && (
+                            <p className="claim-expl"><strong>Reason:</strong> {claim.explanation}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -356,7 +425,7 @@ function InspectModal({ record, onClose }) {
                     {compAddressed.map((pt, i) => (
                       <li key={i} className="agent-sub-item item-align">
                         <span className="sub-bullet">✓</span>
-                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                        <span>{formatAspectText(pt)}</span>
                       </li>
                     ))}
                   </ul>
@@ -370,7 +439,7 @@ function InspectModal({ record, onClose }) {
                     {compMissing.map((pt, i) => (
                       <li key={i} className="agent-sub-item item-missed">
                         <span className="sub-bullet">⚠</span>
-                        <span>{typeof pt === 'object' ? JSON.stringify(pt) : String(pt)}</span>
+                        <span>{formatAspectText(pt)}</span>
                       </li>
                     ))}
                   </ul>
@@ -409,6 +478,7 @@ export default function BatchEvaluationModule() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   const fileInputRef = useRef(null)
   const pollIntervalRef = useRef(null)
@@ -580,6 +650,31 @@ export default function BatchEvaluationModule() {
     document.body.removeChild(link)
   }
 
+  async function handleDownloadBatchPdf() {
+    const id = batchData?.batch_id || batchId
+    if (!id) return
+    try {
+      setDownloadingPdf(true)
+      const res = await fetch(`http://127.0.0.1:8000/api/history/batch/${id}/export-pdf`)
+      if (!res.ok) {
+        throw new Error('Failed to generate batch PDF report.')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Batch_Evaluation_Report_${id}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      alert(err.message || 'Error downloading batch PDF report')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   const records = batchData?.records || []
   const stats = batchData?.statistics || {}
 
@@ -734,7 +829,35 @@ export default function BatchEvaluationModule() {
         </div>
       )}
 
-      {isProcessing && (
+      {/* While processing and NO records yet: show dedicated evaluating hero */}
+      {isProcessing && records.length === 0 && (
+        <div className="batch-evaluating-hero">
+          <div className="evaluating-hero-graphic">
+            <div className="hero-spinner-ring" />
+            <Scale size={26} className="hero-eval-icon" />
+          </div>
+          <h3 className="evaluating-hero-title">Multi-Agent Evaluation in Progress...</h3>
+          <p className="evaluating-hero-subtitle">
+            Evaluating dataset through 5 specialized LLM judges (Relevance, Fact Verification, Hallucination, Completeness & Verdict).
+          </p>
+          <div className="evaluating-hero-status">
+            <div className="hero-status-pill">
+              <div className="pulsing-dot" />
+              <span>
+                {batchData?.current_question
+                  ? `Row 1 of ${totalRows}: "${batchData.current_question}..."`
+                  : `Initializing multi-agent pipeline for ${totalRows} entries...`}
+              </span>
+            </div>
+          </div>
+          <div className="hero-progress-track">
+            <div className="hero-progress-bar-indeterminate" />
+          </div>
+        </div>
+      )}
+
+      {/* When processing and at least 1 record has arrived: show progress bar */}
+      {isProcessing && records.length > 0 && (
         <div className="batch-progress-card">
           <div className="progress-header-row">
             <div className="flex-align-center">
@@ -764,7 +887,7 @@ export default function BatchEvaluationModule() {
         </div>
       )}
 
-      {batchData && (
+      {(records.length > 0 || (!isProcessing && batchData)) && (
         <div className="batch-results-view">
           {batchData.rate_limit_notice && (
             <div className="batch-rate-limit-banner">
@@ -915,6 +1038,16 @@ export default function BatchEvaluationModule() {
                 >
                   <Download size={14} />
                   <span>Export CSV</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-export-pdf"
+                  onClick={handleDownloadBatchPdf}
+                  disabled={downloadingPdf || records.length === 0}
+                  title="Export entire batch audit report as a consolidated PDF"
+                >
+                  <FileDown size={14} />
+                  <span>{downloadingPdf ? 'Generating PDF...' : 'Export Batch PDF'}</span>
                 </button>
                 <button
                   type="button"

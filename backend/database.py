@@ -344,6 +344,41 @@ def get_batch_records(batch_id):
         conn.close()
 
 
+def get_all_batches(limit=30):
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    batch_id,
+                    created_at,
+                    filename,
+                    total_count,
+                    processed_count,
+                    status,
+                    statistics,
+                    error
+                FROM batch_evaluations
+                ORDER BY created_at DESC
+                LIMIT %s;
+            """, (limit,))
+            rows = cur.fetchall()
+            results = []
+            for r in rows:
+                rec = dict(r)
+                if isinstance(rec.get("statistics"), str):
+                    try:
+                        rec["statistics"] = json.loads(rec["statistics"])
+                    except Exception:
+                        rec["statistics"] = {}
+                elif rec.get("statistics") is None:
+                    rec["statistics"] = {}
+                results.append(rec)
+            return results
+    finally:
+        conn.close()
+
+
 def get_analytics_summary(start_date=None, end_date=None):
     conn = get_connection()
     try:

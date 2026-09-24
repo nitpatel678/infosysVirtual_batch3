@@ -25,6 +25,7 @@ from database import (
     update_batch_progress,
     get_batch_job,
     get_batch_records,
+    get_all_batches,
     get_analytics_summary,
 )
 from agents.evaluator import evaluate_response
@@ -33,7 +34,7 @@ load_dotenv()
 
 init_db()
 
-app = FastAPI(title="AI Response Validation System")
+app = FastAPI(title="SentryAI - AI Response Validation Platform")
 
 @app.on_event("startup")
 def startup_event():
@@ -189,6 +190,7 @@ def evaluate(
     }
     verdict_details = {
         "final_verdict": final_verdict,
+        "status": final_verdict,
         "overall_score": composite,
         "dimension_weights": verdict_data.get("dimension_weights", {
             "relevance": 0.25,
@@ -300,6 +302,9 @@ def _run_batch_worker(batch_id: str, rows: list):
     from knowledge_base.retrieval import retrieve
 
     for idx, row in enumerate(rows, 1):
+        if idx > 1:
+            time.sleep(1.8)
+
         q = row.get("question", "").strip()
         ans = row.get("ai_response", "").strip()
         ref = row.get("reference_answer", "").strip() or None
@@ -311,21 +316,59 @@ def _run_batch_worker(batch_id: str, rows: list):
                 _batch_cache[batch_id]["current_question"] = q[:70]
 
         eval_rec = None
-        try:
-            ev_list = []
+        eval_res = None
+        last_error = None
+        ev_list = []
+
+        for attempt in range(2):
             try:
-                ev_list = retrieve(q, top_k=10)
-            except Exception as re:
-                print(f"Batch row {idx} retrieval error: {re}")
+                try:
+                    ev_list = retrieve(q, top_k=10)
+                except Exception as re:
+                    print(f"Batch row {idx} retrieval error: {re}")
 
-            eval_res = evaluate_response(
-                question=q,
-                ai_response=ans,
-                reference_answer=ref,
-                source_document_text=src_info,
-                retrieved_evidence=ev_list,
-            )
+                eval_res = evaluate_response(
+                    question=q,
+                    ai_response=ans,
+                    reference_answer=ref,
+                    source_document_text=src_info,
+                    retrieved_evidence=ev_list,
+                )
+                break
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                err_lower = err_str.lower()
+                is_rate_limit = (
+                    "429" in err_str
+                    or "quota" in err_lower
+                    or "resourceexhausted" in err_lower
+                    or "rate limit" in err_lower
+                    or "too many requests" in err_lower
+                )
+                if is_rate_limit:
+                    if attempt == 0:
+                        print(f"Batch {batch_id}: row {idx} rate limit detected. Backing off 10s before retry...")
+                        time.sleep(10.0)
+                        continue
+                    elif attempt == 1 and len(records) == 0:
+                        print(f"Batch {batch_id}: row 1 still rate limited. Backing off 12s for extra retry...")
+                        time.sleep(12.0)
+                        try:
+                            eval_res = evaluate_response(
+                                question=q,
+                                ai_response=ans,
+                                reference_answer=ref,
+                                source_document_text=src_info,
+                                retrieved_evidence=ev_list,
+                            )
+                            break
+                        except Exception as e_final:
+                            last_error = e_final
+                else:
+                    break
 
+        if eval_res is not None:
             rel_data = eval_res.get("relevance", {})
             acc_data = eval_res.get("accuracy", {})
             hal_data = eval_res.get("hallucination", {})
@@ -389,6 +432,7 @@ def _run_batch_worker(batch_id: str, rows: list):
             }
             verdict_details = {
                 "final_verdict": verdict,
+                "status": verdict,
                 "overall_score": overall_score,
                 "dimension_weights": verdict_data.get("dimension_weights", {}),
                 "normalized_scores": verdict_data.get("normalized_scores", {}),
@@ -449,9 +493,8 @@ def _run_batch_worker(batch_id: str, rows: list):
                 "completeness_details": completeness_details,
                 "verdict_details": verdict_details,
             }
-
-        except Exception as e:
-            err_str = str(e)
+        else:
+            err_str = str(last_error or "Unknown error")
             print(f"Error evaluating batch row {idx}: {err_str}")
             err_lower = err_str.lower()
             is_rate_limit = (
@@ -462,9 +505,9 @@ def _run_batch_worker(batch_id: str, rows: list):
                 or "too many requests" in err_lower
             )
 
-            if is_rate_limit:
+            if is_rate_limit and len(records) > 0:
                 processed_count = len(records)
-                print(f"Batch {batch_id}: API rate limit detected at row {idx}. Finalizing with {processed_count} evaluated rows.")
+                print(f"Batch {batch_id}: Rate limit persistent after row {processed_count}. Finalizing batch.")
                 stats["processed"] = processed_count
                 if processed_count > 0:
                     stats["avg_relevance"] = round(sum_rel / processed_count, 2)
@@ -474,7 +517,7 @@ def _run_batch_worker(batch_id: str, rows: list):
                     stats["avg_overall"] = round(sum_over / processed_count, 2)
                     stats["hallucination_rate"] = round((stats["hallucinations_detected"] / processed_count) * 100, 1)
 
-                notice_msg = f"API rate limit reached at row {idx}. Displaying results for {processed_count} of {total} rows evaluated."
+                notice_msg = f"API rate limit reached at row {idx}. Finalized with {processed_count} evaluated rows."
                 with _batch_lock:
                     if batch_id in _batch_cache:
                         _batch_cache[batch_id]["status"] = "completed"
@@ -501,7 +544,7 @@ def _run_batch_worker(batch_id: str, rows: list):
                 "completeness_score": 1.0,
                 "composite_score": 1.0,
                 "final_verdict": "Fail",
-                "verdict_summary": f"Query evaluation skipped due to error: {err_str[:120]}",
+                "verdict_summary": f"Row evaluation failed: {err_str[:120]}",
                 "hallucination_detected": False,
                 "source_conflict_detected": False,
                 "relevance_details": {},
@@ -703,6 +746,40 @@ def history(limit: Optional[int] = 50):
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
 
+@app.get("/api/history/batches")
+def history_batches(limit: Optional[int] = 30):
+    try:
+        batches = get_all_batches(limit=min(max(limit or 30, 1), 100))
+        return {"batches": batches}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@app.get("/api/history/batch/{batch_id}/export-pdf")
+def export_batch_pdf(batch_id: str):
+    try:
+        from report_generator import build_batch_evaluation_pdf
+        job = get_batch_job(batch_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Batch job not found")
+        records = get_batch_records(batch_id)
+        if not records:
+            raise HTTPException(status_code=404, detail="No evaluated records found for this batch")
+        pdf_bytes = build_batch_evaluation_pdf(job, records)
+        safe_name = (job.get("filename") or "batch").replace(".csv", "")
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=Batch_Evaluation_Report_{safe_name}_{batch_id}.pdf"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate Batch PDF report: {str(e)}")
+
+
 @app.get("/api/history/{eval_id}")
 def history_item(eval_id: int):
     try:
@@ -735,6 +812,7 @@ def export_history_pdf(eval_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF report: {str(e)}")
+
 
 
 @app.get("/api/analytics")

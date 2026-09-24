@@ -20,8 +20,8 @@ export default function Navbar({ activeView, setActiveView, onNavigateHome }) {
             }
           }}
         >
-          <span className="brand-title">AI Response Validator</span>
-          <span className="brand-subtitle">Infosys Springboard #M-3-5</span>
+          <span className="brand-title">SentryAI</span>
+          <span className="brand-subtitle">Response Validation Platform</span>
         </div>
 
         <div className="navbar-actions">
@@ -31,7 +31,7 @@ export default function Navbar({ activeView, setActiveView, onNavigateHome }) {
             onClick={() => setActiveView('evaluate')}
           >
             <CheckSquare size={14} />
-            <span>Single Evaluation</span>
+            <span>Single Evaluation Module</span>
           </button>
 
           <button

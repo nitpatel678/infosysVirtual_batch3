@@ -22,39 +22,17 @@ def evaluate_accuracy(
     has_kb_evidence = len(valid_chunks) > 0
 
     if not has_reference and not has_doc and not has_kb_evidence:
-        claims_prompt = f"""
-Extract 2 to 3 distinct factual claims made in this AI Response:
-"{ai_response}"
-
-Return JSON:
-{{
-  "claims": ["claim 1", "claim 2"]
-}}
-"""
-        extracted = generate_with_fallback(claims_prompt)
-        raw_claims = extracted.get("claims", [])
-        if not isinstance(raw_claims, list):
-            raw_claims = [ai_response[:120]]
-
-        cleaned_claims = [
-            {
-                "claim": str(c),
-                "verdict": "Unverified",
-                "evidence_source": "None",
-                "explanation": "No reference answer was provided and no matching benchmark evidence was found in the knowledge base."
-            }
-            for c in raw_claims if c
-        ]
-
-        return {
-            "score": 3.0,
-            "accuracy_category": "Insufficient Evidence / Unverified",
-            "reasoning": "Cannot determine factual accuracy because no reference answer was provided, no source document was uploaded, and the benchmark knowledge base (TruthfulQA/SQuAD) contains no matching grounding context for this query.",
-            "verified_claims": cleaned_claims,
-            "evidence_citations": [],
-            "contradiction_detected": False,
-            "is_insufficient_evidence": True
-        }
+        context_guidance = """CRITICAL INSTRUCTION - GENERAL KNOWLEDGE & FACTUAL CONSENSUS:
+1. No external reference answer or custom source document was uploaded by the user, and no direct benchmark matches were found.
+2. Evaluate the factual truthfulness of the AI Response against verified scientific, historical, and real-world consensus.
+3. Extract distinct factual claims and evaluate whether each is "Supported", "Partially Correct", or "Incorrect".
+4. Score accuracy objectively: 5.0 for fully accurate facts, 4.0 for mostly accurate, 3.0 for partially correct, 2.0 or 1.0 for false/misleading statements."""
+    else:
+        context_guidance = """CRITICAL INSTRUCTION - STRICT CLOSED-WORLD GROUNDING:
+1. DO NOT use external world knowledge or pre-training memory to verify facts.
+2. Evaluate factual assertions SOLELY based on the provided Reference Ground Truth, Source Document Excerpt, or Retrieved Benchmark Grounding Chunks.
+3. If an assertion is not verifiable from the provided context, mark its verdict as "Unverified" rather than assuming it is true.
+4. Check if the Reference Ground Truth directly CONTRADICTS the Retrieved Benchmark Evidence. If so, set "contradiction_detected": true and detail the conflict."""
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks, 1):
@@ -76,13 +54,9 @@ Return JSON:
 
     prompt = f"""
 You are the Accuracy Judge Agent in an AI Response Validation System.
-Your job is to assess the factual correctness of the AI-generated response against verified reference sources and retrieved benchmark evidence.
+Your job is to assess the factual correctness of the AI-generated response.
 
-CRITICAL INSTRUCTION - STRICT CLOSED-WORLD GROUNDING:
-1. DO NOT use external world knowledge or pre-training memory to verify facts.
-2. Evaluate factual assertions SOLELY based on the provided Reference Ground Truth, Source Document Excerpt, or Retrieved Benchmark Grounding Chunks.
-3. If an assertion is not verifiable from the provided context, mark its verdict as "Unverified" rather than assuming it is true.
-4. Check if the Reference Ground Truth directly CONTRADICTS the Retrieved Benchmark Evidence. If so, set "contradiction_detected": true and detail the conflict.
+{context_guidance}
 
 User Query:
 {question}
@@ -91,13 +65,13 @@ AI Response to Verify:
 {ai_response}
 
 Reference Ground Truth (if provided):
-{reference_answer if has_reference else "None provided"}
+{reference_answer if has_reference else "None provided (use domain consensus)"}
 
 Source Document Excerpt (if uploaded):
 {source_doc_excerpt if has_doc else "None provided"}
 
 Retrieved Benchmark Grounding Evidence (TruthfulQA & SQuAD):
-{evidence_text if evidence_text else "None retrieved"}
+{evidence_text if evidence_text else "None retrieved (use domain consensus)"}
 
 Evaluation Criteria:
 - Score 5.0 (Correct): Every factual assertion is fully supported by the provided evidence / ground truth.
@@ -137,7 +111,7 @@ Return ONLY a JSON object strictly matching this schema:
   "evidence_citations": ["Chunk 1 (TruthfulQA)", "Reference Ground Truth"]
 }}
 """
-    result = generate_with_fallback(prompt)
+    result = generate_with_fallback(prompt, preferred_model="gemini-3.5-flash-lite")
     raw_score = float(result.get("score", 3.0))
     score = round(min(5.0, max(1.0, raw_score)), 1)
     reasoning = str(result.get("reasoning", "Accuracy evaluated against benchmark facts."))

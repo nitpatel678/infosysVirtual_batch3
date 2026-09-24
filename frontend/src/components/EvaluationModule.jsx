@@ -413,14 +413,27 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     <span className="top-score-scale">/ 5.00</span>
                   </div>
                 </div>
-                <div className={`verdict-mini-badge ${results.verdict.status === 'PASS' ? 'verdict-mini-pass' : 'verdict-mini-fail'}`}>
-                  {results.verdict.status === 'PASS' ? (
-                    <CheckCircle2 size={14} />
-                  ) : (
-                    <XCircle size={14} />
-                  )}
-                  <span>{results.verdict.status}</span>
-                </div>
+                {(() => {
+                  const vStatus = results.verdict.status || results.verdict.final_verdict || 'Pass'
+                  const isPass = vStatus.toLowerCase().includes('pass')
+                  const isNeeds = vStatus.toLowerCase().includes('needs') || vStatus.toLowerCase().includes('moderate')
+                  const isUnv = vStatus.toLowerCase().includes('unverified')
+                  const badgeClass = isPass ? 'verdict-mini-pass' : isNeeds ? 'verdict-mini-warn' : isUnv ? 'verdict-mini-unverified' : 'verdict-mini-fail'
+                  return (
+                    <div className={`verdict-mini-badge ${badgeClass}`}>
+                      {isPass ? (
+                        <CheckCircle2 size={14} />
+                      ) : isNeeds ? (
+                        <AlertTriangle size={14} />
+                      ) : isUnv ? (
+                        <AlertCircle size={14} />
+                      ) : (
+                        <XCircle size={14} />
+                      )}
+                      <span>{vStatus.toUpperCase()}</span>
+                    </div>
+                  )
+                })()}
                 <button
                   type="button"
                   onClick={handleReset}
@@ -912,32 +925,31 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
           </div>
 
 
-          <div className={`verdict-banner ${
-            (results.verdict.status || '').toLowerCase().includes('pass')
-              ? 'verdict-banner-pass'
-              : (results.verdict.status || '').toLowerCase().includes('needs')
-              ? 'verdict-banner-moderate'
-              : (results.verdict.status || '').toLowerCase().includes('unverified')
-              ? 'verdict-banner-unverified'
-              : 'verdict-banner-fail'
-          }`}>
-            <div className="verdict-banner-left">
-              <div className="verdict-icon-wrapper">
-                {(results.verdict.status || '').toLowerCase().includes('pass') ? (
-                  <CheckCircle2 size={26} />
-                ) : (results.verdict.status || '').toLowerCase().includes('needs') ? (
-                  <AlertTriangle size={26} />
-                ) : (results.verdict.status || '').toLowerCase().includes('unverified') ? (
-                  <AlertCircle size={26} />
-                ) : (
-                  <XCircle size={26} />
-                )}
-              </div>
-              <div>
-                <div className="verdict-label-row">
-                  <span className="verdict-status-title">
-                    FINAL VERDICT: {results.verdict.status}
-                  </span>
+          {(() => {
+            const vStatus = results.verdict.status || results.verdict.final_verdict || 'Pass'
+            const isPass = vStatus.toLowerCase().includes('pass')
+            const isNeeds = vStatus.toLowerCase().includes('needs') || vStatus.toLowerCase().includes('moderate')
+            const isUnv = vStatus.toLowerCase().includes('unverified')
+            const bannerClass = isPass ? 'verdict-banner-pass' : isNeeds ? 'verdict-banner-moderate' : isUnv ? 'verdict-banner-unverified' : 'verdict-banner-fail'
+            return (
+              <div className={`verdict-banner ${bannerClass}`}>
+                <div className="verdict-banner-left">
+                  <div className="verdict-icon-wrapper">
+                    {isPass ? (
+                      <CheckCircle2 size={26} />
+                    ) : isNeeds ? (
+                      <AlertTriangle size={26} />
+                    ) : isUnv ? (
+                      <AlertCircle size={26} />
+                    ) : (
+                      <XCircle size={26} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="verdict-label-row">
+                      <span className="verdict-status-title">
+                        FINAL VERDICT: {vStatus}
+                      </span>
                   {results.verdict.source_conflict_detected && (
                     <span className="conflict-tag-pill" title="Discrepancy detected between Reference Answer and RAG evidence">
                       Conflict in Ground Truth
@@ -975,6 +987,8 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               <span className="composite-max">/ 5.00</span>
             </div>
           </div>
+            )
+          })()}
 
           <div className="column-card">
             <div className="card-header flex-between">

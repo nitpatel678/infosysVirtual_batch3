@@ -28,7 +28,7 @@ export default function Sidebar({
           }}
           role="button"
           tabIndex={0}
-          title="RAG AI Validator Home"
+          title="SentryAI Home"
         >
           <div className="sidebar-logo-icon">
             <svg
@@ -39,54 +39,34 @@ export default function Sidebar({
               xmlns="http://www.w3.org/2000/svg"
             >
               <path
-                d="M12 2L2 7L12 12L22 7L12 2Z"
-                fill="url(#core-grad-1)"
-              />
-              <path
-                d="M2 17L12 22L22 17"
-                stroke="url(#core-grad-2)"
-                strokeWidth="2"
-                strokeLinecap="round"
+                d="M12 2L4 5.5V11.5C4 16.5 7.4 20.9 12 22C16.6 20.9 20 16.5 20 11.5V5.5L12 2Z"
+                fill="#0f172a"
+                stroke="url(#sentry-sb-grad)"
+                strokeWidth="1.8"
                 strokeLinejoin="round"
               />
-              <path
-                d="M2 12L12 17L22 12"
-                stroke="url(#core-grad-2)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="12" cy="7" r="1.5" fill="#ffffff" />
+              <circle cx="12" cy="11.5" r="3.5" stroke="#38bdf8" strokeWidth="1.5" />
+              <circle cx="12" cy="11.5" r="1.5" fill="#38bdf8" />
               <defs>
                 <linearGradient
-                  id="core-grad-1"
-                  x1="2"
+                  id="sentry-sb-grad"
+                  x1="4"
                   y1="2"
-                  x2="22"
-                  y2="12"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop stopColor="#6366f1" />
-                  <stop offset="1" stopColor="#a855f7" />
-                </linearGradient>
-                <linearGradient
-                  id="core-grad-2"
-                  x1="2"
-                  y1="12"
-                  x2="22"
+                  x2="20"
                   y2="22"
                   gradientUnits="userSpaceOnUse"
                 >
                   <stop stopColor="#38bdf8" />
-                  <stop offset="1" stopColor="#818cf8" />
+                  <stop offset="0.5" stopColor="#6366f1" />
+                  <stop offset="1" stopColor="#a855f7" />
                 </linearGradient>
               </defs>
             </svg>
           </div>
           {!collapsed && (
             <div className="sidebar-brand-text">
-              <span className="sidebar-brand-title">AI Validator</span>
-              <span className="sidebar-brand-sub">Infosys Springboard</span>
+              <span className="sidebar-brand-title">SentryAI</span>
+              <span className="sidebar-brand-sub">Validation Platform</span>
             </div>
           )}
         </div>
@@ -169,7 +149,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="engine-meta-row">
               <Zap size={12} className="text-accent" />
-              <span>Dual Gemini Key Engine</span>
+              <span>GPT-4o Mini & Gemini Engine</span>
             </div>
           )}
         </div>

@@ -45,7 +45,7 @@ function App() {
       <div className="app-main-area">
         <header className="app-topbar">
           <div className="topbar-left">
-            <h2 className="topbar-view-title">{viewTitles[activeView] || 'AI Response Validator'}</h2>
+            <h2 className="topbar-view-title">{viewTitles[activeView] || 'SentryAI'}</h2>
           </div>
           <div className="topbar-right">
             <span className="topbar-badge">Infosys Springboard #M-3-5</span>

@@ -35,7 +35,7 @@ Return ONLY a JSON object strictly matching this schema:
   "missed_aspects": []
 }}
 """
-    result = generate_with_fallback(prompt)
+    result = generate_with_fallback(prompt, preferred_model="gemini-3.1-flash-lite")
     raw_score = float(result.get("score", 3.0))
     score = round(min(5.0, max(1.0, raw_score)), 1)
     reasoning = str(result.get("reasoning", "Relevance assessed based on query intent."))

@@ -29,6 +29,18 @@ def safe_parse(val, fallback=None):
         return fallback
 
 
+def xml_escape(text):
+    if not text:
+        return ""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
 def build_evaluation_pdf(record: dict) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -440,7 +452,7 @@ def build_evaluation_pdf(record: dict) -> bytes:
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#cbd5e1'), spaceAfter=8))
     footer_data = [
         [
-            Paragraph("<b>Infosys Springboard Virtual Internship Batch 3</b><br/><font size=7.5 color='#64748b'>Project #M-3-5 • AI Response Validation System</font>", subtitle_style),
+            Paragraph("<b>Infosys Springboard Virtual Internship Batch 3</b><br/><font size=7.5 color='#64748b'>Project #M-3-5 • SentryAI Response Validation Platform</font>", subtitle_style),
             Paragraph("<para align=right><b>Lead Auditor: Nitin Patel</b><br/><font size=7.5 color='#64748b'>Strict Closed-World Grounding Framework</font></para>", subtitle_style),
         ]
     ]
@@ -453,3 +465,461 @@ def build_evaluation_pdf(record: dict) -> bytes:
 
     doc.build(story)
     return buffer.getvalue()
+
+
+def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'BatchDocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor('#0f172a'),
+    )
+
+    subtitle_style = ParagraphStyle(
+        'BatchDocSub',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor('#64748b'),
+    )
+
+    section_heading = ParagraphStyle(
+        'BatchSecHeading',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=16,
+        textColor=colors.HexColor('#1e293b'),
+        spaceBefore=12,
+        spaceAfter=5,
+    )
+
+    table_header = ParagraphStyle(
+        'BatchTableHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.white,
+    )
+
+    table_cell = ParagraphStyle(
+        'BatchTableCell',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#1e293b'),
+    )
+
+    table_cell_muted = ParagraphStyle(
+        'BatchTableCellMuted',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#64748b'),
+    )
+
+    badge_pass = ParagraphStyle(
+        'BadgePass',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#15803d'),
+    )
+
+    badge_needs = ParagraphStyle(
+        'BadgeNeeds',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#b45309'),
+    )
+
+    badge_fail = ParagraphStyle(
+        'BadgeFail',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#b91c1c'),
+    )
+
+    entry_title_style = ParagraphStyle(
+        'BatchEntryTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.white,
+    )
+
+    entry_title_right = ParagraphStyle(
+        'BatchEntryTitleRight',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.white,
+        alignment=2,
+    )
+
+    detail_label = ParagraphStyle(
+        'BatchDetailLabel',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10.5,
+        textColor=colors.HexColor('#0f172a'),
+    )
+
+    detail_body = ParagraphStyle(
+        'BatchDetailBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10.5,
+        textColor=colors.HexColor('#334155'),
+    )
+
+    dim_cell_style = ParagraphStyle(
+        'BatchDimCell',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#1e293b'),
+        alignment=1,
+    )
+
+    story = []
+
+    # 1. Header & Metadata
+    batch_id = batch_info.get("batch_id", "N/A")
+    filename = batch_info.get("filename", "Dataset CSV")
+    created_at = batch_info.get("created_at", datetime.now().isoformat())
+    if isinstance(created_at, str):
+        try:
+            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            date_str = created_dt.strftime("%d %b %Y • %H:%M:%S UTC")
+        except Exception:
+            date_str = created_at
+    elif hasattr(created_at, "strftime"):
+        date_str = created_at.strftime("%d %b %Y • %H:%M:%S UTC")
+    else:
+        date_str = str(created_at)
+
+    story.append(Paragraph("Batch Multi-Agent Evaluation Report", title_style))
+    story.append(Paragraph(
+        f"<b>Batch ID:</b> {batch_id} &nbsp;|&nbsp; <b>File:</b> {filename} &nbsp;|&nbsp; <b>Evaluated At:</b> {date_str}",
+        subtitle_style,
+    ))
+    story.append(Spacer(1, 8))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3b82f6'), spaceAfter=10))
+
+    # 2. Compute Aggregates
+    stats = batch_info.get("statistics") or {}
+    total_eval = len(records)
+    passed_count = stats.get("passed", sum(1 for r in records if "pass" in (r.get("final_verdict") or "").lower()))
+    needs_count = stats.get("needs_improvement", sum(1 for r in records if "needs" in (r.get("final_verdict") or "").lower()))
+    failed_count = stats.get("failed", sum(1 for r in records if "fail" in (r.get("final_verdict") or "").lower()))
+    hal_count = stats.get("hallucinations_detected", sum(1 for r in records if r.get("hallucination_detected")))
+    conflict_count = stats.get("source_conflicts", sum(1 for r in records if r.get("source_conflict_detected")))
+
+    pass_pct = round((passed_count / total_eval * 100) if total_eval > 0 else 0, 1)
+    needs_pct = round((needs_count / total_eval * 100) if total_eval > 0 else 0, 1)
+    fail_pct = round((failed_count / total_eval * 100) if total_eval > 0 else 0, 1)
+    hal_pct = round((hal_count / total_eval * 100) if total_eval > 0 else 0, 1)
+
+    avg_rel = stats.get("avg_relevance", round(sum(float(r.get("relevance_score") or 0) for r in records) / total_eval, 2) if total_eval > 0 else 0.0)
+    avg_acc = stats.get("avg_accuracy", round(sum(float(r.get("accuracy_score") or 0) for r in records) / total_eval, 2) if total_eval > 0 else 0.0)
+    avg_hal = stats.get("avg_hallucination", round(sum(float(r.get("hallucination_score") or 0) for r in records) / total_eval, 2) if total_eval > 0 else 0.0)
+    avg_comp = stats.get("avg_completeness", round(sum(float(r.get("completeness_score") or 0) for r in records) / total_eval, 2) if total_eval > 0 else 0.0)
+    avg_over = stats.get("avg_overall", round(sum(float(r.get("composite_score") or 0) for r in records) / total_eval, 2) if total_eval > 0 else 0.0)
+
+    # 3. KPI Summary Table
+    story.append(Paragraph("1. Executive Summary & Quality Rates", section_heading))
+    kpi_rows = [
+        [
+            Paragraph("Total Evaluated", table_header),
+            Paragraph("Pass Rate", table_header),
+            Paragraph("Needs Improvement", table_header),
+            Paragraph("Fail Rate", table_header),
+            Paragraph("Hallucination Freq", table_header),
+            Paragraph("Source Conflicts", table_header),
+        ],
+        [
+            Paragraph(f"<b>{total_eval}</b> Rows", table_cell),
+            Paragraph(f"<b>{pass_pct}%</b> ({passed_count})", table_cell),
+            Paragraph(f"<b>{needs_pct}%</b> ({needs_count})", table_cell),
+            Paragraph(f"<b>{fail_pct}%</b> ({failed_count})", table_cell),
+            Paragraph(f"<b>{hal_pct}%</b> ({hal_count})", table_cell),
+            Paragraph(f"<b>{conflict_count}</b> Discrepancies", table_cell),
+        ]
+    ]
+    t_kpi = Table(kpi_rows, colWidths=[90, 90, 90, 90, 90, 90])
+    t_kpi.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f8fafc')),
+        ('PADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t_kpi)
+    story.append(Spacer(1, 8))
+
+    # Dimension Averages Table
+    avg_rows = [
+        [
+            Paragraph("Overall Composite", table_header),
+            Paragraph("Relevance (25%)", table_header),
+            Paragraph("Accuracy (35%)", table_header),
+            Paragraph("Hallucination (25%)", table_header),
+            Paragraph("Completeness (15%)", table_header),
+        ],
+        [
+            Paragraph(f"<b>{avg_over:.2f} / 5.00</b>", table_cell),
+            Paragraph(f"<b>{avg_rel:.2f} / 5.00</b>", table_cell),
+            Paragraph(f"<b>{avg_acc:.2f} / 5.00</b>", table_cell),
+            Paragraph(f"<b>{avg_hal:.2f} / 5.00</b>", table_cell),
+            Paragraph(f"<b>{avg_comp:.2f} / 5.00</b>", table_cell),
+        ]
+    ]
+    t_avg = Table(avg_rows, colWidths=[108, 108, 108, 108, 108])
+    t_avg.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#334155')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f1f5f9')),
+        ('PADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t_avg)
+    story.append(Spacer(1, 12))
+
+    # 4. Item-by-Item Breakdown Table
+    story.append(Paragraph("2. Evaluated Dataset Entries Breakdown", section_heading))
+    item_rows = [
+        [
+            Paragraph("#", table_header),
+            Paragraph("Question & Summary", table_header),
+            Paragraph("Rel", table_header),
+            Paragraph("Acc", table_header),
+            Paragraph("Hal", table_header),
+            Paragraph("Comp", table_header),
+            Paragraph("Score", table_header),
+            Paragraph("Verdict", table_header),
+        ]
+    ]
+
+    for idx, r in enumerate(records, 1):
+        q_text = (r.get("question") or "")[:90]
+        sum_text = (r.get("verdict_summary") or "")[:120]
+        q_cell = Paragraph(f"<b>{q_text}</b><br/><font color='#64748b'>{sum_text}</font>", table_cell)
+
+        v_raw = (r.get("final_verdict") or "Pass").strip()
+        v_low = v_raw.lower()
+        if "pass" in v_low:
+            v_style = badge_pass
+        elif "needs" in v_low:
+            v_style = badge_needs
+        else:
+            v_style = badge_fail
+
+        rel_sc = float(r.get("relevance_score") or 0.0)
+        acc_sc = float(r.get("accuracy_score") or 0.0)
+        hal_sc = float(r.get("hallucination_score") or 0.0)
+        comp_sc = float(r.get("completeness_score") or 0.0)
+        comp_tot = float(r.get("composite_score") or 0.0)
+
+        item_rows.append([
+            Paragraph(f"{r.get('row_index') or idx}", table_cell),
+            q_cell,
+            Paragraph(f"{rel_sc:.1f}", table_cell),
+            Paragraph(f"{acc_sc:.1f}", table_cell),
+            Paragraph(f"{hal_sc:.1f}", table_cell),
+            Paragraph(f"{comp_sc:.1f}", table_cell),
+            Paragraph(f"<b>{comp_tot:.2f}</b>", table_cell),
+            Paragraph(f"<b>{v_raw}</b>", v_style),
+        ])
+
+    t_items = Table(item_rows, colWidths=[24, 256, 40, 40, 40, 40, 45, 55])
+    t_items.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#ffffff'), colors.HexColor('#f8fafc')]),
+        ('PADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(t_items)
+    story.append(Spacer(1, 14))
+
+    # 3. Detailed Per-Entry Evaluation Dossiers
+    story.append(Paragraph("3. Detailed Per-Entry Evaluation Dossiers", section_heading))
+    story.append(Paragraph(
+        "Complete multi-agent validation audit logs showing full question context, AI generated response, reference grounding, individual agent scores, and verdict rationale for each evaluated record.",
+        subtitle_style
+    ))
+    story.append(Spacer(1, 8))
+
+    for idx, r in enumerate(records, 1):
+        row_num = r.get("row_index") or idx
+        q_text = xml_escape(r.get("question") or "")
+        ans_text = xml_escape(r.get("ai_response") or "")
+        ref_text = xml_escape(r.get("reference_answer") or "")
+        v_raw = (r.get("final_verdict") or "Pass").strip()
+        v_low = v_raw.lower()
+        if "pass" in v_low:
+            v_color = "#4ade80"
+            banner_bg = "#064e3b"
+        elif "needs" in v_low:
+            v_color = "#fde047"
+            banner_bg = "#78350f"
+        elif "unverified" in v_low:
+            v_color = "#38bdf8"
+            banner_bg = "#075985"
+        else:
+            v_color = "#f87171"
+            banner_bg = "#7f1d1d"
+
+        sum_text = xml_escape(r.get("verdict_summary") or "")
+        rel_sc = float(r.get("relevance_score") or 0.0)
+        acc_sc = float(r.get("accuracy_score") or 0.0)
+        hal_sc = float(r.get("hallucination_score") or 0.0)
+        comp_sc = float(r.get("completeness_score") or 0.0)
+        comp_tot = float(r.get("composite_score") or 0.0)
+
+        verd_det = safe_parse(r.get("verdict_details"))
+        issues = verd_det.get("major_issues") or []
+        has_conflict = bool(r.get("source_conflict_detected") or verd_det.get("source_conflict_detected"))
+        has_hal = bool(r.get("hallucination_detected"))
+
+        header_table = Table([
+            [
+                Paragraph(f"<b>ENTRY #{row_num}</b> &nbsp;|&nbsp; Verdict: <font color='{v_color}'><b>{v_raw.upper()}</b></font>", entry_title_style),
+                Paragraph(f"Overall Composite: <b>{comp_tot:.2f} / 5.00</b>", entry_title_right),
+            ]
+        ], colWidths=[340, 200])
+        header_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(banner_bg)),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]))
+
+        dim_data = [
+            [
+                Paragraph("<b>Relevance (25%)</b>", dim_cell_style),
+                Paragraph("<b>Accuracy (35%)</b>", dim_cell_style),
+                Paragraph("<b>Hallucination (25%)</b>", dim_cell_style),
+                Paragraph("<b>Completeness (15%)</b>", dim_cell_style),
+            ],
+            [
+                Paragraph(f"<b>{rel_sc:.1f}</b> / 5.0", dim_cell_style),
+                Paragraph(f"<b>{acc_sc:.1f}</b> / 5.0", dim_cell_style),
+                Paragraph(f"<b>{hal_sc:.1f}</b> / 5.0", dim_cell_style),
+                Paragraph(f"<b>{comp_sc:.1f}</b> / 5.0", dim_cell_style),
+            ]
+        ]
+        dim_table = Table(dim_data, colWidths=[130, 130, 130, 130])
+        dim_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+            ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f8fafc')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('PADDING', (0, 0), (-1, -1), 3),
+        ]))
+
+        body_rows = [
+            [Paragraph("<b>User Question:</b>", detail_label)],
+            [Paragraph(f"{q_text}", detail_body)],
+            [Paragraph("<b>Evaluated AI Response:</b>", detail_label)],
+            [Paragraph(f"{ans_text}", detail_body)],
+        ]
+
+        if ref_text:
+            body_rows.extend([
+                [Paragraph("<b>Reference Ground Truth:</b>", detail_label)],
+                [Paragraph(f"{ref_text}", detail_body)],
+            ])
+
+        body_rows.append([dim_table])
+
+        if sum_text:
+            body_rows.extend([
+                [Paragraph("<b>Verdict Synthesis & Reasoning:</b>", detail_label)],
+                [Paragraph(f"{sum_text}", detail_body)],
+            ])
+
+        flags_text = []
+        if has_conflict:
+            flags_text.append("<font color='#b45309'><b>[!] Ground Truth Conflict Detected</b></font>")
+        if has_hal:
+            flags_text.append("<font color='#b91c1c'><b>[X] Hallucination Flagged</b></font>")
+        if issues:
+            for iss in issues[:2]:
+                flags_text.append(f"<font color='#64748b'>• {xml_escape(str(iss))}</font>")
+
+        if flags_text:
+            body_rows.extend([
+                [Paragraph("<b>Audit Flags & Key Issues:</b>", detail_label)],
+                [Paragraph("<br/>".join(flags_text), detail_body)],
+            ])
+
+        content_table = Table(body_rows, colWidths=[520])
+        content_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#ffffff')),
+            ('PADDING', (0, 0), (-1, -1), 3),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        entry_card = Table([
+            [header_table],
+            [content_table],
+        ], colWidths=[540])
+        entry_card.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#94a3b8')),
+            ('PADDING', (0, 0), (-1, -1), 0),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        story.append(KeepTogether([entry_card, Spacer(1, 10)]))
+
+    story.append(Spacer(1, 6))
+
+    # 5. Sign-off & Audit Stamp
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#cbd5e1'), spaceAfter=8))
+    footer_data = [
+        [
+            Paragraph("<b>Infosys Springboard Virtual Internship Batch 3</b><br/><font size=7.5 color='#64748b'>Project #M-3-5 • SentryAI Response Validation Platform</font>", subtitle_style),
+            Paragraph("<para align=right><b>Lead Auditor: Nitin Patel</b><br/><font size=7.5 color='#64748b'>Strict Closed-World Grounding Framework</font></para>", subtitle_style),
+        ]
+    ]
+    t_foot = Table(footer_data, colWidths=[300, 240])
+    t_foot.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('PADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(t_foot)
+
+    doc.build(story)
+    return buffer.getvalue()
+

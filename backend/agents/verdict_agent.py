@@ -103,7 +103,7 @@ Return ONLY a JSON object strictly matching this schema:
 }}
 """
     try:
-        res = generate_with_fallback(prompt)
+        res = generate_with_fallback(prompt, preferred_model="gemini-flash-latest")
         major_issues = res.get("major_issues", [])
         if not isinstance(major_issues, list):
             major_issues = [str(major_issues)] if major_issues else []
@@ -134,6 +134,7 @@ Return ONLY a JSON object strictly matching this schema:
 
     return {
         "final_verdict": final_verdict,
+        "status": final_verdict,
         "composite_score": overall_score,
         "overall_score": overall_score,
         "dimension_weights": weights,

@@ -21,45 +21,24 @@ def evaluate_hallucination(
     has_kb_evidence = len(valid_chunks) > 0
 
     if not has_reference and not has_doc and not has_kb_evidence:
-        claims_prompt = f"""
-Extract 2 to 3 distinct factual statements from this AI Response:
-"{ai_response}"
-
-Return JSON:
-{{
-  "claims": ["statement 1", "statement 2"]
-}}
-"""
-        extracted = generate_with_fallback(claims_prompt)
-        raw_claims = extracted.get("claims", [])
-        if not isinstance(raw_claims, list):
-            raw_claims = [ai_response[:120]]
-
-        cleaned_claims = [
-            {
-                "statement": str(c),
-                "claim_text": str(c),
-                "classification": "Unsupported",
-                "grounding_status": "Unsupported",
-                "is_flagged": True,
-                "evidence_ref": "None",
-                "explanation": "Cannot verify grounding because no reference answer was provided and no benchmark knowledge base chunks match this query."
-            }
-            for c in raw_claims if c
-        ]
-
-        return {
-            "score": 3.0,
-            "hallucination_level": "Undetermined / Insufficient Context",
-            "reasoning": "Cannot determine hallucination status due to absence of reference ground truth and benchmark knowledge base evidence. Claims marked as Unsupported / Unverified.",
-            "hallucination_detected": False,
-            "hallucination_count": 0,
-            "flagged_claims": cleaned_claims,
-            "flagged_statements": cleaned_claims,
-            "supported_statements": [],
-            "is_insufficient_evidence": True
-        }
-
+        context_guidance = """CRITICAL INSTRUCTION - GENERAL KNOWLEDGE & FACTUAL CONSENSUS:
+1. No external reference answer or custom source document was uploaded by the user, and no direct benchmark matches were found.
+2. Evaluate the statements in the AI Response against verified scientific, historical, and real-world consensus.
+3. Check whether the response introduces fictitious entities, made-up statistics, ungrounded speculation, or validates debunked myths.
+4. If a statement is accurate according to established facts, mark it as "Supported". If it is fabricated or false, mark it as "Fabricated" or "Contradictory" and flag it.
+5. Score hallucination objectively: 5.0 for zero hallucination, 4.0 for minor speculation, 3.0 for 1 clear myth/unsupported claim, 2.0 or 1.0 for multiple fabrications."""
+    else:
+        context_guidance = """CRITICAL INSTRUCTION - STRICT CLOSED-WORLD GROUNDING:
+1. Cross-reference individual claims ONLY against the provided Reference Ground Truth, Source Document, and Grounding Benchmark Chunks.
+2. DO NOT use external pre-training memory to assume claims are true.
+3. Break the AI response down into individual factual statements/claims.
+4. Flag specific statements instead of only marking the entire response as hallucinated.
+5. Clearly identify whether each statement is:
+   - "Supported": Directly verified and corroborated by the reference or benchmark chunks.
+   - "Unsupported": Claim lacks grounding evidence in the provided context.
+   - "Fabricated": Introduces fictitious entities, made-up statistics, or validates debunked myths.
+   - "Contradictory": Directly conflicts with known facts in the reference or benchmark chunks.
+6. Provide an explicit explanation for WHY each flagged statement is considered unsupported, fabricated, or contradictory."""
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks, 1):
@@ -81,19 +60,9 @@ Return JSON:
 
     prompt = f"""
 You are the Hallucination Detection Agent in an AI Response Validation System.
-Your job is to identify claims in an AI-generated response that are unsupported, fabricated, or contradicted by available reference information and RAG benchmark evidence.
+Your job is to identify claims in an AI-generated response that are unsupported, fabricated, or contradicted.
 
-CRITICAL INSTRUCTION - STRICT CLOSED-WORLD GROUNDING:
-1. Cross-reference individual claims ONLY against the provided Reference Ground Truth, Source Document, and Grounding Benchmark Chunks.
-2. DO NOT use external pre-training memory to assume claims are true.
-3. Break the AI response down into individual factual statements/claims.
-4. Flag specific statements instead of only marking the entire response as hallucinated.
-5. Clearly identify whether each statement is:
-   - "Supported": Directly verified and corroborated by the reference or benchmark chunks.
-   - "Unsupported": Claim lacks grounding evidence in the provided context.
-   - "Fabricated": Introduces fictitious entities, made-up statistics, or validates debunked myths.
-   - "Contradictory": Directly conflicts with known facts in the reference or benchmark chunks.
-6. Provide an explicit explanation for WHY each flagged statement is considered unsupported, fabricated, or contradictory.
+{context_guidance}
 
 User Query:
 {question}
@@ -102,13 +71,13 @@ AI Response to Audit:
 {ai_response}
 
 Reference Ground Truth:
-{reference_answer if has_reference else "None provided"}
+{reference_answer if has_reference else "None provided (use domain consensus)"}
 
 Uploaded Source Document Excerpt:
 {source_doc_excerpt if has_doc else "None provided"}
 
 Grounding Benchmark Chunks (TruthfulQA & SQuAD):
-{evidence_text if evidence_text else "None retrieved"}
+{evidence_text if evidence_text else "None retrieved (use domain consensus)"}
 
 Evaluation Criteria:
 - Score 5.0 (Zero Hallucination): Every statement is strictly supported by provided ground truth or benchmark evidence (0 flagged).
@@ -152,7 +121,7 @@ Return ONLY a JSON object strictly matching this schema:
   ]
 }}
 """
-    result = generate_with_fallback(prompt)
+    result = generate_with_fallback(prompt, preferred_model="gemini-flash-lite-latest")
     raw_score = float(result.get("score", 3.0))
     score = round(min(5.0, max(1.0, raw_score)), 1)
     reasoning = str(result.get("reasoning", "Hallucination evaluated against verified facts."))

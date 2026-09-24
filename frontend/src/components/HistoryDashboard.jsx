@@ -19,6 +19,10 @@ import {
   HelpCircle,
   Download,
   FileDown,
+  Folder,
+  ChevronDown,
+  ChevronRight,
+  FileSpreadsheet,
 } from 'lucide-react'
 
 function safeParse(val, fallback = {}) {
@@ -87,16 +91,61 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     }
   }
 
+  const [batches, setBatches] = useState([])
+  const [activeTab, setActiveTab] = useState('batches')
+  const [expandedBatches, setExpandedBatches] = useState({})
+  const [downloadingBatchId, setDownloadingBatchId] = useState(null)
+
+  async function handleDownloadBatchPdf(batchId, filename) {
+    if (!batchId) return
+    try {
+      setDownloadingBatchId(batchId)
+      const res = await fetch(`http://127.0.0.1:8000/api/history/batch/${batchId}/export-pdf`)
+      if (!res.ok) {
+        throw new Error('Failed to generate batch PDF report.')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safeName = filename ? filename.replace(/\.[^/.]+$/, "") : batchId
+      a.download = `Batch_Evaluation_Report_${safeName}_${batchId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      alert(err.message || 'Error downloading batch PDF report')
+    } finally {
+      setDownloadingBatchId(null)
+    }
+  }
+
+  function toggleBatchExpand(batchId) {
+    setExpandedBatches((prev) => ({
+      ...prev,
+      [batchId]: !prev[batchId],
+    }))
+  }
+
   async function fetchHistory() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/history?limit=50')
-      if (!res.ok) {
+      const [resRecords, resBatches] = await Promise.all([
+        fetch('http://127.0.0.1:8000/api/history?limit=100'),
+        fetch('http://127.0.0.1:8000/api/history/batches?limit=30'),
+      ])
+      if (!resRecords.ok) {
         throw new Error('Failed to fetch evaluation records from database')
       }
-      const data = await res.json()
-      setRecords(data.records || [])
+      const dataRecords = await resRecords.json()
+      setRecords(dataRecords.records || [])
+
+      if (resBatches.ok) {
+        const dataBatches = await resBatches.json()
+        setBatches(dataBatches.batches || [])
+      }
     } catch (err) {
       setError(err.message || 'Could not connect to database.')
     } finally {
@@ -864,6 +913,9 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     )
   }
 
+  const singleRecords = records.filter((r) => !r.batch_id)
+  const displayRecords = activeTab === 'single' ? singleRecords : records
+
   // List View (All Records Table)
   return (
     <div className="history-container">
@@ -873,7 +925,12 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
             <ArrowLeft size={15} />
             <span>Back to Evaluator</span>
           </button>
-          <h2 className="history-title">Evaluation Records</h2>
+          <div>
+            <h2 className="history-title">Evaluation Records & Batches</h2>
+            <p className="history-subtitle">
+              Browse grouped batch evaluation runs or inspect individual multi-agent evaluation audit logs.
+            </p>
+          </div>
         </div>
         <button type="button" onClick={fetchHistory} className="refresh-btn" title="Refresh">
           <RefreshCw size={14} className={loading ? 'spin-icon' : ''} />
@@ -888,17 +945,206 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
         </div>
       )}
 
+      {/* Segmented Tabs for Grouped Batch Runs vs Single Queries vs All Records */}
+      <div className="history-tabs-container">
+        <button
+          type="button"
+          className={`history-tab-btn ${activeTab === 'batches' ? 'active' : ''}`}
+          onClick={() => setActiveTab('batches')}
+        >
+          <Folder size={14} />
+          <span>Batch Runs ({batches.length})</span>
+        </button>
+        <button
+          type="button"
+          className={`history-tab-btn ${activeTab === 'single' ? 'active' : ''}`}
+          onClick={() => setActiveTab('single')}
+        >
+          <Clock size={14} />
+          <span>Single Queries ({singleRecords.length})</span>
+        </button>
+        <button
+          type="button"
+          className={`history-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveTab('all')}
+        >
+          <Layers size={14} />
+          <span>All Records ({records.length})</span>
+        </button>
+      </div>
+
       {loading ? (
         <div className="history-loading">
           <RefreshCw size={24} className="spin-icon" />
           <p>Loading evaluation records...</p>
         </div>
-      ) : records.length === 0 ? (
+      ) : activeTab === 'batches' ? (
+        batches.length === 0 ? (
+          <div className="empty-history">
+            <Folder size={32} className="empty-icon" />
+            <p>No batch evaluation runs recorded yet.</p>
+            <p className="empty-subtext">Upload a CSV dataset in the Batch Evaluation module to evaluate multiple queries in bulk.</p>
+          </div>
+        ) : (
+          <div className="batch-groups-list">
+            {batches.map((b) => {
+              const batchRecords = records.filter((r) => r.batch_id === b.batch_id)
+              const isExpanded = !!expandedBatches[b.batch_id]
+              const stats = b.statistics || {}
+              const passed = stats.passed !== undefined ? stats.passed : batchRecords.filter((r) => (r.final_verdict || '').toLowerCase().includes('pass')).length
+              const total = b.total_count || batchRecords.length || 0
+              const passPct = total > 0 ? Math.round((passed / total) * 100) : 0
+              const isDownloadingThis = downloadingBatchId === b.batch_id
+
+              return (
+                <div key={b.batch_id} className="batch-group-card">
+                  <div className="batch-group-header flex-between" onClick={() => toggleBatchExpand(b.batch_id)}>
+                    <div className="batch-group-info flex-align-center">
+                      <button
+                        type="button"
+                        className="batch-expand-btn"
+                        onClick={(e) => { e.stopPropagation(); toggleBatchExpand(b.batch_id); }}
+                        title={isExpanded ? "Collapse" : "Expand"}
+                      >
+                        {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                      </button>
+                      <div className="batch-folder-icon">
+                        <Folder size={18} />
+                      </div>
+                      <div>
+                        <div className="flex-align-center gap-2">
+                          <h4 className="batch-group-filename">{b.filename || `Batch Dataset`}</h4>
+                          <span className="batch-id-tag">#{b.batch_id}</span>
+                          <span className={`batch-status-pill status-${b.status || 'completed'}`}>
+                            {b.status === 'completed' ? 'Completed' : b.status}
+                          </span>
+                        </div>
+                        <p className="batch-group-meta">
+                          {formatDate(b.created_at)} • {b.processed_count || batchRecords.length} of {total} queries evaluated
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="batch-group-actions flex-align-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="batch-kpi-pill">
+                        <span className="kpi-label">Pass Rate:</span>
+                        <strong className={passPct >= 70 ? 'text-pass' : 'text-warn'}>{passPct}%</strong>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-batch-pdf-export"
+                        onClick={() => handleDownloadBatchPdf(b.batch_id, b.filename)}
+                        disabled={isDownloadingThis}
+                        title="Download full batch audit report as PDF"
+                      >
+                        <FileDown size={14} />
+                        <span>{isDownloadingThis ? 'Exporting PDF...' : 'Download Batch PDF'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-batch-toggle"
+                        onClick={() => toggleBatchExpand(b.batch_id)}
+                      >
+                        {isExpanded ? 'Hide Queries' : `View Queries (${batchRecords.length})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Collapsible records table for this batch */}
+                  {isExpanded && (
+                    <div className="batch-nested-table-wrapper">
+                      {batchRecords.length === 0 ? (
+                        <div className="nested-empty-notice">
+                          <span>No individual record rows cached for this batch ID.</span>
+                        </div>
+                      ) : (
+                        <table className="history-table nested-batch-table">
+                          <thead>
+                            <tr>
+                              <th className="col-id">#</th>
+                              <th className="col-q">Question</th>
+                              <th className="col-resp">AI Response</th>
+                              <th className="col-scores">Scores (R/A/H/C)</th>
+                              <th className="col-comp">Score</th>
+                              <th className="col-verd">Verdict</th>
+                              <th className="col-action">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {batchRecords.map((r, rIdx) => {
+                              const v = (r.final_verdict || '').toLowerCase()
+                              const isPass = v.includes('pass')
+                              const isNeeds = v.includes('needs') || v.includes('moderate')
+                              const isUnver = v.includes('unverified')
+                              const verdictClass = isPass ? 'verdict-pass' : isNeeds ? 'verdict-moderate' : isUnver ? 'verdict-unverified' : 'verdict-fail'
+
+                              return (
+                                <tr key={r.id || rIdx} className="history-row">
+                                  <td className="row-id">#{r.id}</td>
+                                  <td className="row-q" title={r.question}>
+                                    {r.question.length > 36 ? r.question.substring(0, 36) + '...' : r.question}
+                                  </td>
+                                  <td className="row-resp" title={r.ai_response}>
+                                    {r.ai_response.length > 40 ? r.ai_response.substring(0, 40) + '...' : r.ai_response}
+                                  </td>
+                                  <td className="row-scores">
+                                    <span className={r.relevance_score >= 4 ? 'score-green' : r.relevance_score >= 3 ? 'score-yellow' : 'score-red'}>
+                                      {r.relevance_score?.toFixed(1)}
+                                    </span>
+                                    {' / '}
+                                    <span className={r.accuracy_score >= 4 ? 'score-green' : r.accuracy_score >= 3 ? 'score-yellow' : 'score-red'}>
+                                      {r.accuracy_score?.toFixed(1)}
+                                    </span>
+                                    {' / '}
+                                    <span className={r.hallucination_score >= 4 ? 'score-green' : r.hallucination_score >= 3 ? 'score-yellow' : 'score-red'}>
+                                      {r.hallucination_score?.toFixed(1)}
+                                    </span>
+                                    {' / '}
+                                    <span className={r.completeness_score >= 4 ? 'score-green' : r.completeness_score >= 3 ? 'score-yellow' : 'score-red'}>
+                                      {r.completeness_score?.toFixed(1)}
+                                    </span>
+                                  </td>
+                                  <td className="row-composite">
+                                    <strong>{r.composite_score?.toFixed(2)}</strong>
+                                  </td>
+                                  <td className="row-verdict">
+                                    <span className={`verdict-pill ${verdictClass}`}>
+                                      {isPass ? <CheckCircle2 size={12} /> : isNeeds ? <AlertTriangle size={12} /> : isUnver ? <HelpCircle size={12} /> : <XCircle size={12} />}
+                                      {r.final_verdict}
+                                    </span>
+                                  </td>
+                                  <td className="row-action sticky-col">
+                                    <button
+                                      type="button"
+                                      className="view-record-btn"
+                                      onClick={() => handleViewRecord(r.id)}
+                                      title="View Full Evaluation Report"
+                                    >
+                                      <Eye size={13} />
+                                      <span>View</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )
+      ) : displayRecords.length === 0 ? (
         <div className="empty-history">
           <Clock size={32} className="empty-icon" />
-          <p>No evaluation records found yet.</p>
+          <p>No evaluation records found for this category.</p>
           <button type="button" onClick={onBackToForm} className="submit-btn history-new-btn">
-            Run First Evaluation
+            Run Evaluation
           </button>
         </div>
       ) : (
@@ -918,7 +1164,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => {
+              {displayRecords.map((r) => {
                 const v = (r.final_verdict || '').toLowerCase()
                 const isPass = v.includes('pass')
                 const isNeeds = v.includes('needs') || v.includes('moderate')
@@ -936,12 +1182,16 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       {r.ai_response.length > 36 ? r.ai_response.substring(0, 36) + '...' : r.ai_response}
                     </td>
                     <td className="row-doc">
-                      {r.source_document_name ? (
+                      {r.batch_id ? (
+                        <span className="doc-pill batch-pill" title={`Batch #${r.batch_id}`}>
+                          Batch
+                        </span>
+                      ) : r.source_document_name ? (
                         <span className="doc-pill" title={r.source_document_name}>
                           PDF
                         </span>
                       ) : (
-                        <span className="text-muted">-</span>
+                        <span className="text-muted">Single</span>
                       )}
                     </td>
                     <td className="row-scores">
