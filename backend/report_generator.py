@@ -176,20 +176,38 @@ def build_evaluation_pdf(record: dict) -> bytes:
     verdict_raw = record.get('final_verdict') or verdDetails_status if (verdDetails_status := verd_details.get('status')) else 'EVALUATED'
     verdict_str = verdict_raw.upper()
 
-    verdict_color = '#16a34a' if 'PASS' in verdict_str else '#d97706' if 'NEEDS' in verdict_str or 'MODERATE' in verdict_str else '#64748b' if 'UNVERIFIED' in verdict_str else '#dc2626'
-    verdict_bg = '#f0fdf4' if 'PASS' in verdict_str else '#fefce8' if 'NEEDS' in verdict_str or 'MODERATE' in verdict_str else '#f8fafc' if 'UNVERIFIED' in verdict_str else '#fef2f2'
+    if 'PASS' in verdict_str and 'NEEDS' not in verdict_str and 'FAIL' not in verdict_str:
+        verdict_color = '#16a34a'
+        verdict_bg = '#f0fdf4'
+    elif 'CONFLICT' in verdict_str:
+        verdict_color = '#7c3aed'
+        verdict_bg = '#f5f3ff'
+    elif 'INSUFFICIENT' in verdict_str or 'UNVERIFIED' in verdict_str or 'MORE INFO' in verdict_str:
+        verdict_color = '#0284c7'
+        verdict_bg = '#f0f9ff'
+    elif 'NEEDS' in verdict_str or 'MODERATE' in verdict_str:
+        verdict_color = '#d97706'
+        verdict_bg = '#fefce8'
+    else:
+        verdict_color = '#dc2626'
+        verdict_bg = '#fef2f2'
 
     composite_score = float(record.get('composite_score') or 0.0)
+
+    verdict_title = f"<font color='{verdict_color}'><b>OVERALL VERDICT: {verdict_str}</b></font>"
+    v_tag = verd_details.get('verdict_tag')
+    if v_tag and v_tag.lower() != verdict_raw.lower():
+        verdict_title += f"<br/><font size=9 color='{verdict_color}'><b>Tag:</b> {xml_escape(v_tag)}</font>"
 
     # 2. Executive Summary & Verdict Callout
     verdict_card_data = [
         [
-            Paragraph(f"<font color='{verdict_color}'><b>OVERALL VERDICT: {verdict_str}</b></font>", ParagraphStyle('VTitle', fontName='Helvetica-Bold', fontSize=12, leading=15, textColor=colors.HexColor(verdict_color))),
+            Paragraph(verdict_title, ParagraphStyle('VTitle', fontName='Helvetica-Bold', fontSize=12, leading=15, textColor=colors.HexColor(verdict_color))),
             Paragraph(f"<para align=right><b>Quality Score: {composite_score:.2f} / 5.00</b></para>", ParagraphStyle('VScore', fontName='Helvetica-Bold', fontSize=12, leading=15, textColor=colors.HexColor('#0f172a')))
         ],
         [
-            Paragraph(f"<b>Formula:</b> 25% Relevance + 35% Accuracy + 25% Hallucination + 15% Completeness", subtitle_style),
-            Paragraph(f"<para align=right><font size=8 color='#64748b'>Benchmark Threshold: 3.50</font></para>", subtitle_style)
+            Paragraph(f"<b>Weights:</b> 25% Rel • 30% Acc • 25% Hal • 20% Comp | <b>Quality Gating:</b> 5-Gate Threshold Enforced", subtitle_style),
+            Paragraph(f"<para align=right><font size=8 color='#64748b'>Pass Floor: 3.70 + All Gates</font></para>", subtitle_style)
         ],
         [
             Paragraph(f"<b>Executive Summary:</b> {record.get('verdict_summary') or verd_details.get('summary', 'Evaluation concluded.')}", body_style),
@@ -738,8 +756,12 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
 
         v_raw = (r.get("final_verdict") or "Pass").strip()
         v_low = v_raw.lower()
-        if "pass" in v_low:
+        if "pass" in v_low and "needs" not in v_low and "fail" not in v_low:
             v_style = badge_pass
+        elif "conflict" in v_low:
+            v_style = ParagraphStyle('BadgeConflict', fontName='Helvetica-Bold', fontSize=8, textColor=colors.HexColor('#7c3aed'))
+        elif "insufficient" in v_low or "unverified" in v_low or "more info" in v_low:
+            v_style = ParagraphStyle('BadgeInsufficient', fontName='Helvetica-Bold', fontSize=8, textColor=colors.HexColor('#0284c7'))
         elif "needs" in v_low:
             v_style = badge_needs
         else:
@@ -788,15 +810,18 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
         ref_text = xml_escape(r.get("reference_answer") or "")
         v_raw = (r.get("final_verdict") or "Pass").strip()
         v_low = v_raw.lower()
-        if "pass" in v_low:
+        if "pass" in v_low and "needs" not in v_low and "fail" not in v_low:
             v_color = "#4ade80"
             banner_bg = "#064e3b"
+        elif "conflict" in v_low:
+            v_color = "#c084fc"
+            banner_bg = "#3b0764"
+        elif "insufficient" in v_low or "unverified" in v_low or "more info" in v_low:
+            v_color = "#38bdf8"
+            banner_bg = "#075985"
         elif "needs" in v_low:
             v_color = "#fde047"
             banner_bg = "#78350f"
-        elif "unverified" in v_low:
-            v_color = "#38bdf8"
-            banner_bg = "#075985"
         else:
             v_color = "#f87171"
             banner_bg = "#7f1d1d"
@@ -812,13 +837,18 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
         issues = verd_det.get("major_issues") or []
         has_conflict = bool(r.get("source_conflict_detected") or verd_det.get("source_conflict_detected"))
         has_hal = bool(r.get("hallucination_detected"))
+        v_tag = r.get("verdict_tag") or verd_det.get("verdict_tag")
+
+        title_html = f"<b>ENTRY #{row_num}</b> &nbsp;|&nbsp; Verdict: <font color='{v_color}'><b>{v_raw.upper()}</b></font>"
+        if v_tag and v_tag.lower() != v_raw.lower():
+            title_html += f" &nbsp;<font size=8 color='{v_color}'>[{xml_escape(v_tag)}]</font>"
 
         header_table = Table([
             [
-                Paragraph(f"<b>ENTRY #{row_num}</b> &nbsp;|&nbsp; Verdict: <font color='{v_color}'><b>{v_raw.upper()}</b></font>", entry_title_style),
+                Paragraph(title_html, entry_title_style),
                 Paragraph(f"Overall Composite: <b>{comp_tot:.2f} / 5.00</b>", entry_title_right),
             ]
-        ], colWidths=[340, 200])
+        ], colWidths=[360, 180])
         header_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(banner_bg)),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),

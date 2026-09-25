@@ -185,6 +185,13 @@ Return ONLY a JSON object strictly matching this schema:
                 "explanation": str(c.get("explanation", ""))
             })
 
+    # Determine if evidence is insufficient / unverified
+    is_insufficient = (
+        matched_category == "Insufficient Evidence / Unverified"
+        or bool(result.get("is_insufficient_evidence", False))
+        or (not has_reference and not has_doc and not has_kb_evidence and any(c.get("verdict") == "Unverified" for c in cleaned_claims))
+    )
+
     return {
         "score": score,
         "accuracy_category": matched_category,
@@ -192,6 +199,8 @@ Return ONLY a JSON object strictly matching this schema:
         "reasoning": reasoning,
         "verified_claims": cleaned_claims,
         "evidence_citations": [str(x) for x in citations if x],
-        "is_insufficient_evidence": False
+        "is_insufficient_evidence": is_insufficient,
+        "has_grounding_evidence": bool(has_reference or has_doc or has_kb_evidence)
     }
+
 

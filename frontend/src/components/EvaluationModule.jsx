@@ -17,6 +17,8 @@ import {
   Database,
   Layers,
   Sparkles,
+  GitCompare,
+  HelpCircle,
 } from 'lucide-react'
 import EvidenceCard from './EvidenceCard'
 import PipelineTracker from './PipelineTracker'
@@ -415,18 +417,32 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                 </div>
                 {(() => {
                   const vStatus = results.verdict.status || results.verdict.final_verdict || 'Pass'
-                  const isPass = vStatus.toLowerCase().includes('pass')
-                  const isNeeds = vStatus.toLowerCase().includes('needs') || vStatus.toLowerCase().includes('moderate')
-                  const isUnv = vStatus.toLowerCase().includes('unverified')
-                  const badgeClass = isPass ? 'verdict-mini-pass' : isNeeds ? 'verdict-mini-warn' : isUnv ? 'verdict-mini-unverified' : 'verdict-mini-fail'
+                  const vLow = vStatus.toLowerCase()
+                  const isPass = vLow.includes('pass') && !vLow.includes('needs') && !vLow.includes('fail')
+                  const isConflict = vLow.includes('conflict')
+                  const isInsufficient = vLow.includes('insufficient') || vLow.includes('unverified') || vLow.includes('more info')
+                  const isNeeds = vLow.includes('needs') || vLow.includes('moderate')
+
+                  const badgeClass = isPass
+                    ? 'verdict-mini-pass'
+                    : isConflict
+                    ? 'verdict-mini-conflict'
+                    : isInsufficient
+                    ? 'verdict-mini-insufficient'
+                    : isNeeds
+                    ? 'verdict-mini-warn'
+                    : 'verdict-mini-fail'
+
                   return (
                     <div className={`verdict-mini-badge ${badgeClass}`}>
                       {isPass ? (
                         <CheckCircle2 size={14} />
+                      ) : isConflict ? (
+                        <GitCompare size={14} />
+                      ) : isInsufficient ? (
+                        <HelpCircle size={14} />
                       ) : isNeeds ? (
                         <AlertTriangle size={14} />
-                      ) : isUnv ? (
-                        <AlertCircle size={14} />
                       ) : (
                         <XCircle size={14} />
                       )}
@@ -927,20 +943,37 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
           {(() => {
             const vStatus = results.verdict.status || results.verdict.final_verdict || 'Pass'
-            const isPass = vStatus.toLowerCase().includes('pass')
-            const isNeeds = vStatus.toLowerCase().includes('needs') || vStatus.toLowerCase().includes('moderate')
-            const isUnv = vStatus.toLowerCase().includes('unverified')
-            const bannerClass = isPass ? 'verdict-banner-pass' : isNeeds ? 'verdict-banner-moderate' : isUnv ? 'verdict-banner-unverified' : 'verdict-banner-fail'
+            const vLow = vStatus.toLowerCase()
+            const isPass = vLow.includes('pass') && !vLow.includes('needs') && !vLow.includes('fail')
+            const isConflict = vLow.includes('conflict')
+            const isInsufficient = vLow.includes('insufficient') || vLow.includes('unverified') || vLow.includes('more info')
+            const isNeeds = vLow.includes('needs') || vLow.includes('moderate')
+
+            const bannerClass = isPass
+              ? 'verdict-banner-pass'
+              : isConflict
+              ? 'verdict-banner-conflict'
+              : isInsufficient
+              ? 'verdict-banner-insufficient'
+              : isNeeds
+              ? 'verdict-banner-moderate'
+              : 'verdict-banner-fail'
+
+            const vTag = results.verdict.verdict_tag
+            const qualityGates = results.verdict.quality_gates
+
             return (
               <div className={`verdict-banner ${bannerClass}`}>
                 <div className="verdict-banner-left">
                   <div className="verdict-icon-wrapper">
                     {isPass ? (
                       <CheckCircle2 size={26} />
+                    ) : isConflict ? (
+                      <GitCompare size={26} />
+                    ) : isInsufficient ? (
+                      <HelpCircle size={26} />
                     ) : isNeeds ? (
                       <AlertTriangle size={26} />
-                    ) : isUnv ? (
-                      <AlertCircle size={26} />
                     ) : (
                       <XCircle size={26} />
                     )}
@@ -950,43 +983,69 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                       <span className="verdict-status-title">
                         FINAL VERDICT: {vStatus}
                       </span>
-                  {results.verdict.source_conflict_detected && (
-                    <span className="conflict-tag-pill" title="Discrepancy detected between Reference Answer and RAG evidence">
-                      Conflict in Ground Truth
-                    </span>
-                  )}
-                  <span className="formula-tag-pill">
-                    Weights: 25% Rel • 35% Acc • 25% Hal • 15% Comp
-                  </span>
+                      {vTag && vTag !== vStatus && (
+                        <span className="verdict-tag-pill" title="Descriptive Quality Classification">
+                          {vTag}
+                        </span>
+                      )}
+                      {results.verdict.source_conflict_detected && (
+                        <span className="conflict-tag-pill" title="Discrepancy detected between Reference Answer and RAG evidence">
+                          Conflict in Ground Truth
+                        </span>
+                      )}
+                      <span className="formula-tag-pill">
+                        Weights: 25% Rel • 30% Acc • 25% Hal • 20% Comp
+                      </span>
+                    </div>
+
+                    <p className="verdict-summary-text">{results.verdict.summary || results.verdict.verdict_summary}</p>
+
+                    {qualityGates && Object.keys(qualityGates).length > 0 && (
+                      <div className="quality-gates-container">
+                        <div className="quality-gates-header">
+                          Multi-Metric Quality Gates ({results.verdict.gates_passed ?? 0}/{results.verdict.total_gates ?? 5} Cleared):
+                        </div>
+                        <div className="quality-gates-pills">
+                          {Object.entries(qualityGates).map(([key, gate]) => (
+                            <span
+                              key={key}
+                              className={`quality-gate-pill ${gate.passed ? 'gate-cleared' : 'gate-breached'}`}
+                              title={gate.reason}
+                            >
+                              {gate.passed ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                              <span>{gate.name}: {gate.passed ? 'Passed' : 'Breached'}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {results.verdict.major_issues && results.verdict.major_issues.length > 0 && (
+                      <div className="verdict-issues-row">
+                        <span className="issues-label">Key Issues:</span>
+                        {results.verdict.major_issues.map((iss, i) => (
+                          <span key={i} className="issue-pill">⚠ {iss}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {results.verdict.strengths && results.verdict.strengths.length > 0 && (
+                      <div className="verdict-issues-row">
+                        <span className="issues-label">Strengths:</span>
+                        {results.verdict.strengths.map((str, i) => (
+                          <span key={i} className="strength-pill">✓ {str}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="verdict-summary-text">{results.verdict.summary || results.verdict.verdict_summary}</p>
 
-                {results.verdict.major_issues && results.verdict.major_issues.length > 0 && (
-                  <div className="verdict-issues-row">
-                    <span className="issues-label">Key Issues:</span>
-                    {results.verdict.major_issues.map((iss, i) => (
-                      <span key={i} className="issue-pill">⚠ {iss}</span>
-                    ))}
-                  </div>
-                )}
-
-                {results.verdict.strengths && results.verdict.strengths.length > 0 && (
-                  <div className="verdict-issues-row">
-                    <span className="issues-label">Strengths:</span>
-                    {results.verdict.strengths.map((str, i) => (
-                      <span key={i} className="strength-pill">✓ {str}</span>
-                    ))}
-                  </div>
-                )}
+                <div className="verdict-banner-score">
+                  <span className="composite-label">Weighted Overall</span>
+                  <span className="composite-number">{results.scores.composite?.toFixed(2)}</span>
+                  <span className="composite-max">/ 5.00</span>
+                </div>
               </div>
-            </div>
-
-            <div className="verdict-banner-score">
-              <span className="composite-label">Weighted Overall</span>
-              <span className="composite-number">{results.scores.composite?.toFixed(2)}</span>
-              <span className="composite-max">/ 5.00</span>
-            </div>
-          </div>
             )
           })()}
 

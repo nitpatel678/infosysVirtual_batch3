@@ -205,6 +205,12 @@ Return ONLY a JSON object strictly matching this schema:
         else:
             matched_level = "Severe Hallucination"
 
+    is_insufficient = (
+        "insufficient" in raw_level.lower()
+        or "undetermined" in raw_level.lower()
+        or bool(result.get("is_insufficient_evidence", False))
+    )
+
     return {
         "score": score,
         "hallucination_level": matched_level,
@@ -214,7 +220,9 @@ Return ONLY a JSON object strictly matching this schema:
         "flagged_claims": cleaned_claims,
         "flagged_statements": flagged_statements,
         "supported_statements": supported_statements,
-        "is_insufficient_evidence": False
+        "is_insufficient_evidence": is_insufficient,
+        "has_grounding_evidence": bool(has_reference or has_doc or has_kb_evidence)
     }
+
 
 

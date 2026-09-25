@@ -474,18 +474,20 @@ def get_analytics_summary(start_date=None, end_date=None):
                 sum_hal += h_score
                 sum_com += co_score
 
-                is_pass = "pass" in v
+                is_pass = "pass" in v and "needs" not in v and "fail" not in v
                 is_needs = "needs" in v or "moderate" in v
-                is_unver = "unverified" in v
+                is_unver = "unverified" in v or "insufficient" in v or "more info" in v
+                is_conflict = "conflict" in v
 
                 if is_pass:
                     passed += 1
                 elif is_needs:
                     needs += 1
-                elif is_unver:
+                elif is_unver or is_conflict:
                     unverified += 1
                 else:
                     failed += 1
+
 
                 hal_details = r["hallucination_details"] or {}
                 if isinstance(hal_details, str):

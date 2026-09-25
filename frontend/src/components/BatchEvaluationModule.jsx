@@ -20,6 +20,7 @@ import {
   ArrowRight,
   ExternalLink,
   FileDown,
+  GitCompare,
 } from 'lucide-react'
 
 function safeNum(val, fallback = 0) {
@@ -59,9 +60,10 @@ function safeList(val) {
 
 function getVerdictBadgeClass(verdict) {
   const v = (verdict || '').toLowerCase()
-  if (v.includes('pass')) return 'badge-verdict-pass'
+  if (v.includes('pass') && !v.includes('needs') && !v.includes('fail')) return 'badge-verdict-pass'
+  if (v.includes('conflict')) return 'badge-verdict-conflict'
+  if (v.includes('insufficient') || v.includes('unverified') || v.includes('more info')) return 'badge-verdict-insufficient'
   if (v.includes('needs')) return 'badge-verdict-needs'
-  if (v.includes('unverified')) return 'badge-verdict-unverified'
   return 'badge-verdict-fail'
 }
 
@@ -194,44 +196,61 @@ function InspectModal({ record, onClose }) {
             </div>
           </div>
 
-          <div className={`verdict-banner ${
-            finalVerdict === 'Pass'
-              ? 'verdict-banner-pass'
-              : finalVerdict === 'Needs Improvement'
-              ? 'verdict-banner-moderate'
-              : finalVerdict === 'Unverified'
-              ? 'verdict-banner-unverified'
-              : 'verdict-banner-fail'
-          }`}>
-            <div className="verdict-banner-left">
-              <div className="verdict-icon-wrapper">
-                {finalVerdict === 'Pass' ? (
-                  <CheckCircle2 size={24} />
-                ) : finalVerdict === 'Needs Improvement' ? (
-                  <AlertTriangle size={24} />
-                ) : finalVerdict === 'Unverified' ? (
-                  <HelpCircle size={24} />
-                ) : (
-                  <XCircle size={24} />
-                )}
-              </div>
-              <div>
-                <div className="verdict-label-row">
-                  <span className="verdict-status-title">FINAL VERDICT: {finalVerdict}</span>
-                  {record.source_conflict_detected && (
-                    <span className="conflict-tag-pill">Conflict in Ground Truth</span>
-                  )}
-                </div>
-                <p className="verdict-summary-text">{record.verdict_summary || 'Evaluation completed across all 4 dimensions.'}</p>
-              </div>
-            </div>
+          {(() => {
+            const vLow = finalVerdict.toLowerCase()
+            const isPass = vLow.includes('pass') && !vLow.includes('needs') && !vLow.includes('fail')
+            const isConflict = vLow.includes('conflict')
+            const isInsufficient = vLow.includes('insufficient') || vLow.includes('unverified') || vLow.includes('more info')
+            const isNeeds = vLow.includes('needs') || vLow.includes('moderate')
 
-            <div className="verdict-banner-score">
-              <span className="composite-label">Weighted Score</span>
-              <span className="composite-number">{safeScore(record.composite_score, 2)}</span>
-              <span className="composite-max">/ 5.00</span>
-            </div>
-          </div>
+            const bannerClass = isPass
+              ? 'verdict-banner-pass'
+              : isConflict
+              ? 'verdict-banner-conflict'
+              : isInsufficient
+              ? 'verdict-banner-insufficient'
+              : isNeeds
+              ? 'verdict-banner-moderate'
+              : 'verdict-banner-fail'
+
+            return (
+              <div className={`verdict-banner ${bannerClass}`}>
+                <div className="verdict-banner-left">
+                  <div className="verdict-icon-wrapper">
+                    {isPass ? (
+                      <CheckCircle2 size={24} />
+                    ) : isConflict ? (
+                      <GitCompare size={24} />
+                    ) : isInsufficient ? (
+                      <HelpCircle size={24} />
+                    ) : isNeeds ? (
+                      <AlertTriangle size={24} />
+                    ) : (
+                      <XCircle size={24} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="verdict-label-row">
+                      <span className="verdict-status-title">FINAL VERDICT: {finalVerdict}</span>
+                      {record.verdict_tag && record.verdict_tag !== finalVerdict && (
+                        <span className="verdict-tag-pill">{record.verdict_tag}</span>
+                      )}
+                      {record.source_conflict_detected && (
+                        <span className="conflict-tag-pill">Conflict in Ground Truth</span>
+                      )}
+                    </div>
+                    <p className="verdict-summary-text">{record.verdict_summary || 'Evaluation completed across all 4 dimensions.'}</p>
+                  </div>
+                </div>
+
+                <div className="verdict-banner-score">
+                  <span className="composite-label">Weighted Score</span>
+                  <span className="composite-number">{safeScore(record.composite_score, 2)}</span>
+                  <span className="composite-max">/ 5.00</span>
+                </div>
+              </div>
+            )
+          })()}
 
           <div className="agent-grid-2col modal-grid">
             <div className={`agent-card ${getScoreColorClass(record.relevance_score)}`}>

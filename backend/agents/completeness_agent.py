@@ -22,31 +22,19 @@ def evaluate_completeness(
     has_kb_evidence = len(valid_chunks) > 0
 
     if not has_reference and not has_doc and not has_kb_evidence:
-        prompt_reqs = f"""
-Identify the core requirements or sub-questions in this User Query:
-"{question}"
-
-Return JSON:
-{{
-  "requirements": ["requirement 1", "requirement 2"]
-}}
-"""
-        try:
-            reqs_data = generate_with_fallback(prompt_reqs, preferred_model="gemini-3.5-flash-lite")
-            reqs = reqs_data.get("requirements", [question])
-        except Exception:
-            reqs = [question]
-
-        return {
-            "score": 3.0,
-            "completeness_category": "Unverified / Insufficient Evidence",
-            "identified_requirements": reqs if isinstance(reqs, list) else [question],
-            "addressed_aspects": ["General response provided without verified reference ground truth"],
-            "missing_aspects": ["Cannot verify missing domain nuances because no reference ground truth or benchmark evidence is available"],
-            "source_conflict_detected": False,
-            "is_insufficient_evidence": True,
-            "reasoning": "Completeness could not be definitively verified against ground truth because neither a reference answer nor matching benchmark chunks were available in the knowledge base.",
-        }
+        context_guidance = """GROUNDING GUIDANCE (DOMAIN CONSENSUS):
+1. No external reference answer, uploaded document, or benchmark chunks are available.
+2. Evaluate completeness against established, verified factual consensus for this subject.
+3. Deconstruct the User Query into its core requirements and expected components (e.g., if asking for 'primary symptoms' in plural, a complete answer must cover the main recognized clinical symptoms, not just an isolated single symptom).
+4. If the query asks for private, proprietary, or specific internal document details that are not provided, categorize as "Unverified / Insufficient Evidence".
+5. Otherwise, score completeness objectively: if only an isolated fragment is provided (e.g., 1 symptom or 1 component out of several), score it 1.5 - 2.5 ("Substantially Incomplete") and explicitly list all omitted primary aspects."""
+    else:
+        context_guidance = """GROUNDING GUIDANCE (STRICT GROUNDING):
+1. Deconstruct the User Query into its discrete sub-questions, requirements, or expected components.
+2. If a Reference Ground Truth is available, use it to identify all expected information that should be covered by the AI response.
+3. If no Reference Ground Truth is available, use the Retrieved Benchmark Evidence and Source Document Excerpt to determine the necessary components of a complete response.
+4. Check for Source Conflict: If the Reference Answer and the Retrieved Benchmark Evidence prescribe contradictory requirements or facts, set "source_conflict_detected": true and detail the discrepancy.
+5. Identify specific omissions, unanswered sub-questions, missing explanations, or insufficiently covered aspects."""
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks[:5], 1):
@@ -68,12 +56,7 @@ Return JSON:
 You are the Completeness Judge Agent in an AI Response Validation System.
 Your job is to evaluate whether the AI-generated response sufficiently and thoroughly addresses all relevant aspects, sub-questions, and required details of the submitted query.
 
-GROUNDING RULES:
-1. Deconstruct the User Query into its discrete sub-questions, requirements, or expected components.
-2. If a Reference Ground Truth is available, use it to identify all expected information that should be covered by the AI response.
-3. If no Reference Ground Truth is available, use the Retrieved Benchmark Evidence and Source Document Excerpt to determine the necessary components of a complete response.
-4. Check for Source Conflict: If the Reference Answer and the Retrieved Benchmark Evidence prescribe contradictory requirements or facts, set "source_conflict_detected": true and detail the discrepancy.
-5. Identify specific omissions, unanswered sub-questions, missing explanations, or insufficiently covered aspects.
+{context_guidance}
 
 User Query:
 {question}
@@ -82,20 +65,28 @@ AI Response to Assess:
 {ai_response}
 
 Reference Ground Truth (if provided):
-{reference_answer if has_reference else "None provided"}
+{reference_answer if has_reference else "None provided (use established domain consensus)"}
 
 Source Document Excerpt (if uploaded):
 {source_doc_excerpt if has_doc else "None provided"}
 
 Retrieved Benchmark Evidence (TruthfulQA / SQuAD):
-{evidence_text if evidence_text else "None retrieved"}
+{evidence_text if evidence_text else "None retrieved (use established domain consensus)"}
 
 Scoring Rubric (1.0 to 5.0):
 - 5.0 (Fully Complete): Comprehensively answers all explicit requirements and implicit sub-questions with thorough depth, helpful context, and complete clarity.
 - 4.0 (Mostly Complete): Directly answers the primary question and core requirements; only minor optional context, secondary nuances, or peripheral details are omitted.
 - 3.0 (Partially Complete): Answers the main prompt on a high level, but omits important sub-questions, specific mechanisms, examples, or actionable depth.
-- 2.0 (Substantially Incomplete): Answers only a minor fragment or single sub-point, leaving the majority of necessary information unaddressed.
+- 2.0 (Substantially Incomplete): Answers only a minor fragment or single sub-point (e.g. naming only 1 symptom when multiple primary symptoms were requested), leaving the majority of necessary information unaddressed.
 - 1.0 (Severely Deficient): Fails to answer the question, provides an evasive or trivial fragment, or completely omits required substance.
+
+Categories:
+- "Fully Complete"
+- "Mostly Complete"
+- "Partially Complete"
+- "Substantially Incomplete"
+- "Severely Deficient"
+- "Unverified / Insufficient Evidence" (use ONLY when private/proprietary context is required but missing)
 
 Return ONLY a JSON object strictly matching this schema:
 {{
@@ -120,18 +111,32 @@ Return ONLY a JSON object strictly matching this schema:
     score = float(result.get("score", 3.0))
     score = min(5.0, max(1.0, score))
 
-    category = str(result.get("completeness_category", ""))
-    if not category:
+    raw_cat = str(result.get("completeness_category", "")).strip()
+    valid_categories = [
+        "Fully Complete",
+        "Mostly Complete",
+        "Partially Complete",
+        "Substantially Incomplete",
+        "Severely Deficient",
+        "Unverified / Insufficient Evidence",
+    ]
+    matched_cat = None
+    for vc in valid_categories:
+        if vc.lower() in raw_cat.lower():
+            matched_cat = vc
+            break
+
+    if not matched_cat:
         if score >= 4.5:
-            category = "Fully Complete"
+            matched_cat = "Fully Complete"
         elif score >= 3.5:
-            category = "Mostly Complete"
+            matched_cat = "Mostly Complete"
         elif score >= 2.5:
-            category = "Partially Complete"
+            matched_cat = "Partially Complete"
         elif score >= 1.5:
-            category = "Substantially Incomplete"
+            matched_cat = "Substantially Incomplete"
         else:
-            category = "Severely Deficient"
+            matched_cat = "Severely Deficient"
 
     reqs = result.get("identified_requirements", [])
     if not isinstance(reqs, list) or not reqs:
@@ -148,14 +153,22 @@ Return ONLY a JSON object strictly matching this schema:
     conflict = bool(result.get("source_conflict_detected", False))
     reasoning = str(result.get("reasoning", "Completeness assessed against query requirements and reference ground truth."))
 
+    is_insufficient = (
+        "insufficient" in matched_cat.lower()
+        or "unverified" in matched_cat.lower()
+        or bool(result.get("is_insufficient_evidence", False))
+    )
+
     return {
         "score": round(score, 2),
-        "completeness_category": category,
+        "completeness_category": matched_cat,
         "identified_requirements": reqs,
         "addressed_aspects": addressed,
         "missing_aspects": missing,
         "source_conflict_detected": conflict,
         "conflict_details": str(result.get("conflict_details", "")),
-        "is_insufficient_evidence": False,
+        "is_insufficient_evidence": is_insufficient,
+        "has_grounding_evidence": bool(has_reference or has_doc or has_kb_evidence),
         "reasoning": reasoning,
     }
+

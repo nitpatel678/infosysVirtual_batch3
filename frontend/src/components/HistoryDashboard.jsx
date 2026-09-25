@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileSpreadsheet,
+  GitCompare,
 } from 'lucide-react'
 
 function safeParse(val, fallback = {}) {
@@ -204,10 +205,12 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     const calibratedAccCategory = getAccCategory(accScore, accDetails.accuracy_category, accContradiction)
 
     const verdictStatus = recordDetail?.final_verdict || verdDetails.status || 'EVALUATED'
-    const isPass = verdictStatus.toLowerCase().includes('pass')
-    const isNeeds = verdictStatus.toLowerCase().includes('needs') || verdictStatus.toLowerCase().includes('moderate')
-    const isUnverified = verdictStatus.toLowerCase().includes('unverified')
-    const hasConflict = verdDetails.source_conflict_detected || compDetails.source_conflict_detected || accContradiction
+    const vLow = verdictStatus.toLowerCase()
+    const isPass = vLow.includes('pass') && !vLow.includes('needs') && !vLow.includes('fail')
+    const isConflict = vLow.includes('conflict') || verdDetails.source_conflict_detected || compDetails.source_conflict_detected || accContradiction
+    const isInsufficient = vLow.includes('insufficient') || vLow.includes('unverified') || vLow.includes('more info')
+    const isNeeds = vLow.includes('needs') || vLow.includes('moderate')
+    const hasConflict = isConflict
 
     return (
       <div className="history-container">
@@ -272,8 +275,8 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                       <span className="top-score-scale">/ 5.00</span>
                     </div>
                   </div>
-                  <div className={`verdict-mini-badge ${isPass ? 'verdict-mini-pass' : isNeeds ? 'verdict-mini-warn' : isUnverified ? 'verdict-mini-unverified' : 'verdict-mini-fail'}`}>
-                    {isPass ? <CheckCircle2 size={14} /> : isNeeds ? <AlertTriangle size={14} /> : isUnverified ? <HelpCircle size={14} /> : <XCircle size={14} />}
+                  <div className={`verdict-mini-badge ${isPass ? 'verdict-mini-pass' : isConflict ? 'verdict-mini-conflict' : isInsufficient ? 'verdict-mini-insufficient' : isNeeds ? 'verdict-mini-warn' : 'verdict-mini-fail'}`}>
+                    {isPass ? <CheckCircle2 size={14} /> : isConflict ? <GitCompare size={14} /> : isInsufficient ? <HelpCircle size={14} /> : isNeeds ? <AlertTriangle size={14} /> : <XCircle size={14} />}
                     <span>{verdictStatus}</span>
                   </div>
                 </div>
@@ -312,20 +315,24 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
             <div className={`verdict-banner ${
               isPass
                 ? 'verdict-banner-pass'
+                : isConflict
+                ? 'verdict-banner-conflict'
+                : isInsufficient
+                ? 'verdict-banner-insufficient'
                 : isNeeds
                 ? 'verdict-banner-moderate'
-                : isUnverified
-                ? 'verdict-banner-unverified'
                 : 'verdict-banner-fail'
             }`}>
               <div className="verdict-banner-left">
                 <div className="verdict-icon-wrapper">
                   {isPass ? (
                     <CheckCircle2 size={26} />
+                  ) : isConflict ? (
+                    <GitCompare size={26} />
+                  ) : isInsufficient ? (
+                    <HelpCircle size={26} />
                   ) : isNeeds ? (
                     <AlertTriangle size={26} />
-                  ) : isUnverified ? (
-                    <AlertCircle size={26} />
                   ) : (
                     <XCircle size={26} />
                   )}
@@ -335,16 +342,41 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     <span className="verdict-status-title">
                       FINAL VERDICT: {verdictStatus}
                     </span>
+                    {(recordDetail.verdict_tag || verdDetails.verdict_tag) && (recordDetail.verdict_tag || verdDetails.verdict_tag) !== verdictStatus && (
+                      <span className="verdict-tag-pill">
+                        {recordDetail.verdict_tag || verdDetails.verdict_tag}
+                      </span>
+                    )}
                     {hasConflict && (
                       <span className="conflict-tag-pill" title="Discrepancy detected between Reference Ground Truth and Benchmark Knowledge Base">
                         Conflict in Ground Truth
                       </span>
                     )}
                     <span className="formula-tag-pill">
-                      Weights: 25% Rel • 35% Acc • 25% Hal • 15% Comp
+                      Weights: 25% Rel • 30% Acc • 25% Hal • 20% Comp
                     </span>
                   </div>
                   <p className="verdict-summary-text">{recordDetail.verdict_summary || verdDetails.summary}</p>
+
+                  {verdDetails.quality_gates && Object.keys(verdDetails.quality_gates).length > 0 && (
+                    <div className="quality-gates-container">
+                      <div className="quality-gates-header">
+                        Multi-Metric Quality Gates ({verdDetails.gates_passed ?? 0}/{verdDetails.total_gates ?? 5} Cleared):
+                      </div>
+                      <div className="quality-gates-pills">
+                        {Object.entries(verdDetails.quality_gates).map(([key, gate]) => (
+                          <span
+                            key={key}
+                            className={`quality-gate-pill ${gate.passed ? 'gate-cleared' : 'gate-breached'}`}
+                            title={gate.reason}
+                          >
+                            {gate.passed ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                            <span>{gate.name}: {gate.passed ? 'Passed' : 'Breached'}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {verdDetails.major_issues && verdDetails.major_issues.length > 0 && (
                     <div className="verdict-issues-row">
@@ -1075,10 +1107,11 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                           <tbody>
                             {batchRecords.map((r, rIdx) => {
                               const v = (r.final_verdict || '').toLowerCase()
-                              const isPass = v.includes('pass')
+                              const isPass = v.includes('pass') && !v.includes('needs') && !v.includes('fail')
+                              const isConflict = v.includes('conflict')
+                              const isUnver = v.includes('unverified') || v.includes('insufficient') || v.includes('more info')
                               const isNeeds = v.includes('needs') || v.includes('moderate')
-                              const isUnver = v.includes('unverified')
-                              const verdictClass = isPass ? 'verdict-pass' : isNeeds ? 'verdict-moderate' : isUnver ? 'verdict-unverified' : 'verdict-fail'
+                              const verdictClass = isPass ? 'verdict-pass' : isConflict ? 'verdict-conflict' : isUnver ? 'verdict-unverified' : isNeeds ? 'verdict-moderate' : 'verdict-fail'
 
                               return (
                                 <tr key={r.id || rIdx} className="history-row">
@@ -1111,7 +1144,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                                   </td>
                                   <td className="row-verdict">
                                     <span className={`verdict-pill ${verdictClass}`}>
-                                      {isPass ? <CheckCircle2 size={12} /> : isNeeds ? <AlertTriangle size={12} /> : isUnver ? <HelpCircle size={12} /> : <XCircle size={12} />}
+                                      {isPass ? <CheckCircle2 size={12} /> : isConflict ? <GitCompare size={12} /> : isNeeds ? <AlertTriangle size={12} /> : isUnver ? <HelpCircle size={12} /> : <XCircle size={12} />}
                                       {r.final_verdict}
                                     </span>
                                   </td>
@@ -1166,10 +1199,11 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
             <tbody>
               {displayRecords.map((r) => {
                 const v = (r.final_verdict || '').toLowerCase()
-                const isPass = v.includes('pass')
+                const isPass = v.includes('pass') && !v.includes('needs') && !v.includes('fail')
+                const isConflict = v.includes('conflict')
+                const isUnver = v.includes('unverified') || v.includes('insufficient') || v.includes('more info')
                 const isNeeds = v.includes('needs') || v.includes('moderate')
-                const isUnver = v.includes('unverified')
-                const verdictClass = isPass ? 'verdict-pass' : isNeeds ? 'verdict-moderate' : isUnver ? 'verdict-unverified' : 'verdict-fail'
+                const verdictClass = isPass ? 'verdict-pass' : isConflict ? 'verdict-conflict' : isUnver ? 'verdict-unverified' : isNeeds ? 'verdict-moderate' : 'verdict-fail'
 
                 return (
                   <tr key={r.id} className="history-row">
@@ -1216,7 +1250,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
                     </td>
                     <td className="row-verdict">
                       <span className={`verdict-pill ${verdictClass}`}>
-                        {isPass ? <CheckCircle2 size={12} /> : isNeeds ? <AlertTriangle size={12} /> : isUnver ? <HelpCircle size={12} /> : <XCircle size={12} />}
+                        {isPass ? <CheckCircle2 size={12} /> : isConflict ? <GitCompare size={12} /> : isNeeds ? <AlertTriangle size={12} /> : isUnver ? <HelpCircle size={12} /> : <XCircle size={12} />}
                         {r.final_verdict}
                       </span>
                     </td>
