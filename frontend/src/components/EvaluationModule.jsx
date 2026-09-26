@@ -281,9 +281,9 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
 
         <div className="engine-toggle-card">
           <div className="engine-toggle-header">
-            <span className="engine-toggle-label">Select AI Evaluation Engine:</span>
+            <span className="engine-toggle-label">Select AI Engine:</span>
             <span className="engine-active-indicator">
-              {aiEngine === 'openai' ? '⚡ Tier-1 Primary Engine (Active)' : '✨ Multimodal Engine (Active)'}
+              {aiEngine === 'openai' ? 'Active: OpenAI GPT' : 'Active: Google Gemini'}
             </span>
           </div>
           <div className="engine-toggle-group">
@@ -292,26 +292,28 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               className={`btn-engine-toggle ${aiEngine === 'openai' ? 'active' : ''}`}
               onClick={() => setAiEngine('openai')}
               disabled={loading}
-              title="OpenAI GPT-4o-mini: High Speed, Tier-1 High RPM"
+              title="OpenAI GPT"
             >
-              <Zap size={15} className="engine-icon text-accent" />
-              <div className="engine-btn-text">
-                <span className="engine-name">OpenAI GPT-4o-mini</span>
-                <span className="engine-tag">Primary • Low Latency</span>
-              </div>
+              <img
+                src="https://img.icons8.com/color/48/chatgpt.png"
+                alt="OpenAI GPT"
+                className="engine-logo-img"
+              />
+              <span className="engine-name">OpenAI GPT</span>
             </button>
             <button
               type="button"
               className={`btn-engine-toggle ${aiEngine === 'gemini' ? 'active' : ''}`}
               onClick={() => setAiEngine('gemini')}
               disabled={loading}
-              title="Google Gemini 1.5: Multimodal Evaluation Engine"
+              title="Google Gemini"
             >
-              <Sparkles size={15} className="engine-icon text-purple" />
-              <div className="engine-btn-text">
-                <span className="engine-name">Google Gemini 1.5</span>
-                <span className="engine-tag">Multimodal Engine</span>
-              </div>
+              <img
+                src="https://img.icons8.com/ios-filled/50/gemini-ai.png"
+                alt="Google Gemini"
+                className="engine-logo-img gemini-logo-img"
+              />
+              <span className="engine-name">Google Gemini</span>
             </button>
           </div>
         </div>
@@ -491,16 +493,16 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     </div>
                   )
                 })()}
-                <div className={`verdict-engine-tag ${results.ai_engine === 'gemini' ? 'tag-gemini' : 'tag-openai'}`} title={`Evaluation performed with ${results.ai_engine_name || (results.ai_engine === 'gemini' ? 'Google Gemini 1.5' : 'OpenAI GPT-4o-mini')}`}>
+                <div className="verdict-engine-tag" title={`Evaluation performed with ${results.ai_engine === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'}`}>
                   {results.ai_engine === 'gemini' ? (
                     <>
-                      <Sparkles size={12} className="text-purple" />
-                      <span>Gemini 1.5</span>
+                      <img src="https://img.icons8.com/ios-filled/50/gemini-ai.png" alt="Gemini" className="mini-engine-logo gemini-logo-img" />
+                      <span>Google Gemini</span>
                     </>
                   ) : (
                     <>
-                      <Zap size={12} className="text-accent" />
-                      <span>GPT-4o Mini</span>
+                      <img src="https://img.icons8.com/color/48/chatgpt.png" alt="OpenAI" className="mini-engine-logo" />
+                      <span>OpenAI GPT</span>
                     </>
                   )}
                 </div>

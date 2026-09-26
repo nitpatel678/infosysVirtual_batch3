@@ -149,7 +149,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="engine-meta-row">
               <Zap size={12} className="text-accent" />
-              <span>GPT-4o Mini & Gemini Engine</span>
+              <span>OpenAI & Google Engine</span>
             </div>
           )}
         </div>

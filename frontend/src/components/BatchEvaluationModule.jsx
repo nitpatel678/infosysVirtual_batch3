@@ -755,9 +755,9 @@ export default function BatchEvaluationModule() {
 
       <div className="engine-toggle-card batch-engine-card">
         <div className="engine-toggle-header">
-          <span className="engine-toggle-label">Batch AI Evaluation Engine:</span>
+          <span className="engine-toggle-label">Batch AI Engine:</span>
           <span className="engine-active-indicator">
-            {aiEngine === 'openai' ? '⚡ Tier-1 Primary Engine (Active)' : '✨ Multimodal Engine (Active)'}
+            {aiEngine === 'openai' ? 'Active: OpenAI GPT' : 'Active: Google Gemini'}
           </span>
         </div>
         <div className="engine-toggle-group">
@@ -766,26 +766,28 @@ export default function BatchEvaluationModule() {
             className={`btn-engine-toggle ${aiEngine === 'openai' ? 'active' : ''}`}
             onClick={() => setAiEngine('openai')}
             disabled={isProcessing}
-            title="OpenAI GPT-4o-mini: High Throughput, Zero Quota Freezing"
+            title="OpenAI GPT"
           >
-            <Zap size={15} className="engine-icon text-accent" />
-            <div className="engine-btn-text">
-              <span className="engine-name">OpenAI GPT-4o-mini</span>
-              <span className="engine-tag">Primary • High Throughput</span>
-            </div>
+            <img
+              src="https://img.icons8.com/color/48/chatgpt.png"
+              alt="OpenAI GPT"
+              className="engine-logo-img"
+            />
+            <span className="engine-name">OpenAI GPT</span>
           </button>
           <button
             type="button"
             className={`btn-engine-toggle ${aiEngine === 'gemini' ? 'active' : ''}`}
             onClick={() => setAiEngine('gemini')}
             disabled={isProcessing}
-            title="Google Gemini 1.5: Multimodal Engine"
+            title="Google Gemini"
           >
-            <Sparkles size={15} className="engine-icon text-purple" />
-            <div className="engine-btn-text">
-              <span className="engine-name">Google Gemini 1.5</span>
-              <span className="engine-tag">Multimodal Engine</span>
-            </div>
+            <img
+              src="https://img.icons8.com/ios-filled/50/gemini-ai.png"
+              alt="Google Gemini"
+              className="engine-logo-img gemini-logo-img"
+            />
+            <span className="engine-name">Google Gemini</span>
           </button>
         </div>
       </div>
@@ -901,8 +903,8 @@ export default function BatchEvaluationModule() {
             Evaluating dataset through 5 specialized LLM judges (Relevance, Fact Verification, Hallucination, Completeness & Verdict).
           </p>
           <div className="evaluating-hero-engine-badge">
-            <Zap size={13} className="text-accent" />
-            <span>High-Throughput Engine: OpenAI GPT-4o-mini (Zero Quota Freezes)</span>
+            <img src="https://img.icons8.com/color/48/chatgpt.png" alt="OpenAI" className="mini-engine-logo" />
+            <span>Active Batch Engine: OpenAI GPT</span>
           </div>
           <div className="evaluating-hero-status">
             <div className="hero-status-pill">
@@ -930,8 +932,8 @@ export default function BatchEvaluationModule() {
                 Evaluating Batch Dataset: {processedCount} of {totalRows} completed ({progressPercent}%)
               </span>
               <span className="batch-engine-tag-sm">
-                <Zap size={12} className="text-accent" />
-                <span>GPT-4o-mini Engine</span>
+                <img src="https://img.icons8.com/color/48/chatgpt.png" alt="OpenAI" className="mini-engine-logo" />
+                <span>OpenAI GPT</span>
               </span>
             </div>
             <span className="progress-eta">
@@ -959,12 +961,12 @@ export default function BatchEvaluationModule() {
         <div className="batch-results-view">
           <div className="batch-engine-active-bar flex-between">
             <div className="flex-align-center">
-              <Zap size={14} className="text-accent" />
+              <img src="https://img.icons8.com/color/48/chatgpt.png" alt="OpenAI" className="mini-engine-logo" />
               <span className="batch-engine-active-text">
-                Evaluated with <strong>OpenAI GPT-4o-mini</strong> • High-Throughput Parallel Engine
+                Evaluated with <strong>OpenAI GPT</strong> • Multi-Agent Pipeline
               </span>
             </div>
-            <span className="batch-engine-status-pill">Tier-1 High RPM Pipeline</span>
+            <span className="batch-engine-status-pill">High-Throughput</span>
           </div>
           {batchData.rate_limit_notice && (
             <div className="batch-rate-limit-banner">
