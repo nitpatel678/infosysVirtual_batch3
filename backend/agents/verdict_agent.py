@@ -8,6 +8,7 @@ def generate_verdict(
     accuracy_data,
     hallucination_data,
     completeness_data,
+    engine="openai",
 ):
     rel = float(relevance_data.get("score", 3.0))
     acc = float(accuracy_data.get("score", 3.0))
@@ -215,7 +216,7 @@ Return ONLY a JSON object strictly matching this schema:
 }}
 """
     try:
-        res = generate_with_fallback(prompt, preferred_model="gemini-flash-latest")
+        res = generate_with_fallback(prompt, preferred_model="gemini-flash-latest", engine=engine)
         major_issues = res.get("major_issues", [])
         if not isinstance(major_issues, list):
             major_issues = [str(major_issues)] if major_issues else []

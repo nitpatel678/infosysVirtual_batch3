@@ -12,9 +12,10 @@ def orchestrate_evaluation(
     reference_answer=None,
     source_document_text=None,
     retrieved_evidence=None,
+    engine="openai",
 ):
     with ThreadPoolExecutor(max_workers=4) as executor:
-        f_rel = executor.submit(evaluate_relevance, question, ai_response)
+        f_rel = executor.submit(evaluate_relevance, question, ai_response, engine=engine)
         f_acc = executor.submit(
             evaluate_accuracy,
             question,
@@ -22,6 +23,7 @@ def orchestrate_evaluation(
             reference_answer,
             source_document_text,
             retrieved_evidence,
+            engine=engine,
         )
         f_hal = executor.submit(
             evaluate_hallucination,
@@ -30,6 +32,7 @@ def orchestrate_evaluation(
             reference_answer,
             source_document_text,
             retrieved_evidence,
+            engine=engine,
         )
         f_comp = executor.submit(
             evaluate_completeness,
@@ -38,6 +41,7 @@ def orchestrate_evaluation(
             reference_answer,
             source_document_text,
             retrieved_evidence,
+            engine=engine,
         )
 
         rel_data = f_rel.result()
@@ -52,6 +56,7 @@ def orchestrate_evaluation(
         accuracy_data=acc_data,
         hallucination_data=hal_data,
         completeness_data=comp_data,
+        engine=engine,
     )
 
     return {

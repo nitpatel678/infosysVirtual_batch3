@@ -19,6 +19,7 @@ import {
   Sparkles,
   GitCompare,
   HelpCircle,
+  Zap,
 } from 'lucide-react'
 import EvidenceCard from './EvidenceCard'
 import PipelineTracker from './PipelineTracker'
@@ -86,6 +87,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
   const [aiResponse, setAiResponse] = useState('')
   const [referenceAnswer, setReferenceAnswer] = useState('')
   const [pdfFile, setPdfFile] = useState(null)
+  const [aiEngine, setAiEngine] = useState('openai')
 
   const [pipelineStep, setPipelineStep] = useState(0)
   const [stepMessage, setStepMessage] = useState('')
@@ -211,6 +213,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
     if (pdfFile) {
       formData.append('source_document', pdfFile)
     }
+    formData.append('ai_engine', aiEngine)
 
     try {
       setPipelineStep(1)
@@ -275,6 +278,44 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
             </button>
           )}
         </div>
+
+        <div className="engine-toggle-card">
+          <div className="engine-toggle-header">
+            <span className="engine-toggle-label">Select AI Evaluation Engine:</span>
+            <span className="engine-active-indicator">
+              {aiEngine === 'openai' ? '⚡ Tier-1 Primary Engine (Active)' : '✨ Multimodal Engine (Active)'}
+            </span>
+          </div>
+          <div className="engine-toggle-group">
+            <button
+              type="button"
+              className={`btn-engine-toggle ${aiEngine === 'openai' ? 'active' : ''}`}
+              onClick={() => setAiEngine('openai')}
+              disabled={loading}
+              title="OpenAI GPT-4o-mini: High Speed, Tier-1 High RPM"
+            >
+              <Zap size={15} className="engine-icon text-accent" />
+              <div className="engine-btn-text">
+                <span className="engine-name">OpenAI GPT-4o-mini</span>
+                <span className="engine-tag">Primary • Low Latency</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={`btn-engine-toggle ${aiEngine === 'gemini' ? 'active' : ''}`}
+              onClick={() => setAiEngine('gemini')}
+              disabled={loading}
+              title="Google Gemini 1.5: Multimodal Evaluation Engine"
+            >
+              <Sparkles size={15} className="engine-icon text-purple" />
+              <div className="engine-btn-text">
+                <span className="engine-name">Google Gemini 1.5</span>
+                <span className="engine-tag">Multimodal Engine</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <div className="input-group">
           <label className="input-label">
             User Question <span className="req-star">*</span>
@@ -450,6 +491,19 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                     </div>
                   )
                 })()}
+                <div className={`verdict-engine-tag ${results.ai_engine === 'gemini' ? 'tag-gemini' : 'tag-openai'}`} title={`Evaluation performed with ${results.ai_engine_name || (results.ai_engine === 'gemini' ? 'Google Gemini 1.5' : 'OpenAI GPT-4o-mini')}`}>
+                  {results.ai_engine === 'gemini' ? (
+                    <>
+                      <Sparkles size={12} className="text-purple" />
+                      <span>Gemini 1.5</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={12} className="text-accent" />
+                      <span>GPT-4o Mini</span>
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleReset}

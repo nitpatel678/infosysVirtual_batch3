@@ -21,6 +21,8 @@ import {
   ExternalLink,
   FileDown,
   GitCompare,
+  Zap,
+  Sparkles,
 } from 'lucide-react'
 
 function safeNum(val, fallback = 0) {
@@ -498,6 +500,7 @@ export default function BatchEvaluationModule() {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [aiEngine, setAiEngine] = useState('openai')
 
   const fileInputRef = useRef(null)
   const pollIntervalRef = useRef(null)
@@ -562,6 +565,7 @@ export default function BatchEvaluationModule() {
     try {
       const formData = new FormData()
       formData.append('file', csvFile)
+      formData.append('ai_engine', aiEngine)
 
       const res = await fetch('http://127.0.0.1:8000/api/evaluate/batch', {
         method: 'POST',
@@ -749,6 +753,43 @@ export default function BatchEvaluationModule() {
         </div>
       </div>
 
+      <div className="engine-toggle-card batch-engine-card">
+        <div className="engine-toggle-header">
+          <span className="engine-toggle-label">Batch AI Evaluation Engine:</span>
+          <span className="engine-active-indicator">
+            {aiEngine === 'openai' ? '⚡ Tier-1 Primary Engine (Active)' : '✨ Multimodal Engine (Active)'}
+          </span>
+        </div>
+        <div className="engine-toggle-group">
+          <button
+            type="button"
+            className={`btn-engine-toggle ${aiEngine === 'openai' ? 'active' : ''}`}
+            onClick={() => setAiEngine('openai')}
+            disabled={isProcessing}
+            title="OpenAI GPT-4o-mini: High Throughput, Zero Quota Freezing"
+          >
+            <Zap size={15} className="engine-icon text-accent" />
+            <div className="engine-btn-text">
+              <span className="engine-name">OpenAI GPT-4o-mini</span>
+              <span className="engine-tag">Primary • High Throughput</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            className={`btn-engine-toggle ${aiEngine === 'gemini' ? 'active' : ''}`}
+            onClick={() => setAiEngine('gemini')}
+            disabled={isProcessing}
+            title="Google Gemini 1.5: Multimodal Engine"
+          >
+            <Sparkles size={15} className="engine-icon text-purple" />
+            <div className="engine-btn-text">
+              <span className="engine-name">Google Gemini 1.5</span>
+              <span className="engine-tag">Multimodal Engine</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {!csvFile && (
         <div
           className="csv-dropzone"
@@ -859,6 +900,10 @@ export default function BatchEvaluationModule() {
           <p className="evaluating-hero-subtitle">
             Evaluating dataset through 5 specialized LLM judges (Relevance, Fact Verification, Hallucination, Completeness & Verdict).
           </p>
+          <div className="evaluating-hero-engine-badge">
+            <Zap size={13} className="text-accent" />
+            <span>High-Throughput Engine: OpenAI GPT-4o-mini (Zero Quota Freezes)</span>
+          </div>
           <div className="evaluating-hero-status">
             <div className="hero-status-pill">
               <div className="pulsing-dot" />
@@ -884,6 +929,10 @@ export default function BatchEvaluationModule() {
               <span className="progress-title">
                 Evaluating Batch Dataset: {processedCount} of {totalRows} completed ({progressPercent}%)
               </span>
+              <span className="batch-engine-tag-sm">
+                <Zap size={12} className="text-accent" />
+                <span>GPT-4o-mini Engine</span>
+              </span>
             </div>
             <span className="progress-eta">
               {batchData?.current_question ? `Current: "${batchData.current_question}..."` : 'Processing agents in parallel...'}
@@ -908,6 +957,15 @@ export default function BatchEvaluationModule() {
 
       {(records.length > 0 || (!isProcessing && batchData)) && (
         <div className="batch-results-view">
+          <div className="batch-engine-active-bar flex-between">
+            <div className="flex-align-center">
+              <Zap size={14} className="text-accent" />
+              <span className="batch-engine-active-text">
+                Evaluated with <strong>OpenAI GPT-4o-mini</strong> • High-Throughput Parallel Engine
+              </span>
+            </div>
+            <span className="batch-engine-status-pill">Tier-1 High RPM Pipeline</span>
+          </div>
           {batchData.rate_limit_notice && (
             <div className="batch-rate-limit-banner">
               <AlertTriangle size={18} className="banner-icon-amber" />

@@ -7,6 +7,7 @@ def evaluate_hallucination(
     reference_answer=None,
     source_document_text=None,
     retrieved_evidence=None,
+    engine="openai",
 ):
     has_reference = bool(reference_answer and reference_answer.strip())
     has_doc = bool(source_document_text and source_document_text.strip())
@@ -121,7 +122,7 @@ Return ONLY a JSON object strictly matching this schema:
   ]
 }}
 """
-    result = generate_with_fallback(prompt, preferred_model="gemini-flash-lite-latest")
+    result = generate_with_fallback(prompt, preferred_model="gemini-flash-lite-latest", engine=engine)
     raw_score = float(result.get("score", 3.0))
     score = round(min(5.0, max(1.0, raw_score)), 1)
     reasoning = str(result.get("reasoning", "Hallucination evaluated against verified facts."))

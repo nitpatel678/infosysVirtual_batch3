@@ -87,6 +87,7 @@ def evaluate(
     ai_response: str = Form(...),
     reference_answer: Optional[str] = Form(None),
     source_document: Optional[UploadFile] = File(None),
+    ai_engine: Optional[str] = Form("openai"),
 ):
     trimmed_question = question.strip()
     trimmed_response = ai_response.strip()
@@ -97,6 +98,10 @@ def evaluate(
         raise HTTPException(status_code=400, detail="AI response cannot be empty")
 
     trimmed_reference = reference_answer.strip() if reference_answer and reference_answer.strip() else None
+
+    norm_engine = (ai_engine or "openai").strip().lower()
+    if norm_engine not in ["openai", "gemini"]:
+        norm_engine = "openai"
 
     source_doc_name = None
     source_doc_text = None
@@ -135,6 +140,7 @@ def evaluate(
             reference_answer=trimmed_reference,
             source_document_text=source_doc_text,
             retrieved_evidence=retrieved_evidence,
+            engine=norm_engine,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Evaluation agent error: {str(e)}")
@@ -211,6 +217,8 @@ def evaluate(
         "major_issues": verdict_data.get("major_issues", []),
         "strengths": verdict_data.get("strengths", []),
         "verdict_summary": verdict_summary,
+        "ai_engine": norm_engine,
+        "ai_engine_name": "OpenAI GPT-4o-mini" if norm_engine == "openai" else "Google Gemini 1.5",
     }
 
     saved_record = None
@@ -245,6 +253,8 @@ def evaluate(
     return {
         "id": saved_record.get("id") if saved_record else None,
         "created_at": str(saved_record.get("created_at")) if saved_record else None,
+        "ai_engine": norm_engine,
+        "ai_engine_name": "OpenAI GPT-4o-mini" if norm_engine == "openai" else "Google Gemini 1.5",
         "input": {
             "question": trimmed_question,
             "ai_response": trimmed_response,
@@ -310,7 +320,7 @@ def _run_batch_worker(batch_id: str, rows: list):
 
     for idx, row in enumerate(rows, 1):
         if idx > 1:
-            time.sleep(1.8)
+            time.sleep(0.3)
 
         q = row.get("question", "").strip()
         ans = row.get("ai_response", "").strip()
@@ -334,46 +344,21 @@ def _run_batch_worker(batch_id: str, rows: list):
                 except Exception as re:
                     print(f"Batch row {idx} retrieval error: {re}")
 
+                # Batch ALWAYS evaluates strictly via OpenAI gpt-4o-mini to guarantee zero quota freezing
                 eval_res = evaluate_response(
                     question=q,
                     ai_response=ans,
                     reference_answer=ref,
                     source_document_text=src_info,
                     retrieved_evidence=ev_list,
+                    engine="openai",
                 )
                 break
             except Exception as e:
                 last_error = e
-                err_str = str(e)
-                err_lower = err_str.lower()
-                is_rate_limit = (
-                    "429" in err_str
-                    or "quota" in err_lower
-                    or "resourceexhausted" in err_lower
-                    or "rate limit" in err_lower
-                    or "too many requests" in err_lower
-                )
-                if is_rate_limit:
-                    if attempt == 0:
-                        print(f"Batch {batch_id}: row {idx} rate limit detected. Backing off 10s before retry...")
-                        time.sleep(10.0)
-                        continue
-                    elif attempt == 1 and len(records) == 0:
-                        print(f"Batch {batch_id}: row 1 still rate limited. Backing off 12s for extra retry...")
-                        time.sleep(12.0)
-                        try:
-                            eval_res = evaluate_response(
-                                question=q,
-                                ai_response=ans,
-                                reference_answer=ref,
-                                source_document_text=src_info,
-                                retrieved_evidence=ev_list,
-                            )
-                            break
-                        except Exception as e_final:
-                            last_error = e_final
-                else:
-                    break
+                print(f"Batch {batch_id}: row {idx} attempt {attempt + 1} error: {e}")
+                if attempt == 0:
+                    time.sleep(1.0)
 
         if eval_res is not None:
             rel_data = eval_res.get("relevance", {})
@@ -509,45 +494,11 @@ def _run_batch_worker(batch_id: str, rows: list):
                 "hallucination_details": hallucination_details,
                 "completeness_details": completeness_details,
                 "verdict_details": verdict_details,
+                "ai_engine": "OpenAI GPT-4o-mini",
             }
         else:
             err_str = str(last_error or "Unknown error")
             print(f"Error evaluating batch row {idx}: {err_str}")
-            err_lower = err_str.lower()
-            is_rate_limit = (
-                "429" in err_str
-                or "quota" in err_lower
-                or "resourceexhausted" in err_lower
-                or "rate limit" in err_lower
-                or "too many requests" in err_lower
-            )
-
-            if is_rate_limit and len(records) > 0:
-                processed_count = len(records)
-                print(f"Batch {batch_id}: Rate limit persistent after row {processed_count}. Finalizing batch.")
-                stats["processed"] = processed_count
-                if processed_count > 0:
-                    stats["avg_relevance"] = round(sum_rel / processed_count, 2)
-                    stats["avg_accuracy"] = round(sum_acc / processed_count, 2)
-                    stats["avg_hallucination"] = round(sum_hal / processed_count, 2)
-                    stats["avg_completeness"] = round(sum_comp / processed_count, 2)
-                    stats["avg_overall"] = round(sum_over / processed_count, 2)
-                    stats["hallucination_rate"] = round((stats["hallucinations_detected"] / processed_count) * 100, 1)
-
-                notice_msg = f"API rate limit reached at row {idx}. Finalized with {processed_count} evaluated rows."
-                with _batch_lock:
-                    if batch_id in _batch_cache:
-                        _batch_cache[batch_id]["status"] = "completed"
-                        _batch_cache[batch_id]["processed_count"] = processed_count
-                        _batch_cache[batch_id]["statistics"] = stats
-                        _batch_cache[batch_id]["rate_limit_notice"] = notice_msg
-
-                try:
-                    update_batch_progress(batch_id, processed_count, "completed", statistics=stats)
-                except Exception as db_err:
-                    print(f"Rate limit batch DB update note: {db_err}")
-                return
-
             stats["failed"] += 1
             eval_rec = {
                 "id": idx,
@@ -610,7 +561,10 @@ def _run_batch_worker(batch_id: str, rows: list):
 
 
 @app.post("/api/evaluate/batch")
-def evaluate_batch(file: UploadFile = File(...)):
+def evaluate_batch(
+    file: UploadFile = File(...),
+    ai_engine: Optional[str] = Form("openai"),
+):
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files (.csv) are supported for batch evaluation.")
 
@@ -666,6 +620,8 @@ def evaluate_batch(file: UploadFile = File(...)):
             _batch_cache[batch_id] = {
                 "batch_id": batch_id,
                 "filename": file.filename,
+                "ai_engine": "OpenAI GPT-4o-mini",
+                "ai_engine_name": "OpenAI GPT-4o-mini",
                 "total_count": len(valid_rows),
                 "processed_count": 0,
                 "status": "processing",
@@ -687,6 +643,7 @@ def evaluate_batch(file: UploadFile = File(...)):
                     "avg_hallucination": 0.0,
                     "avg_completeness": 0.0,
                     "avg_overall": 0.0,
+                    "ai_engine": "OpenAI GPT-4o-mini",
                 },
             }
 
@@ -705,6 +662,8 @@ def evaluate_batch(file: UploadFile = File(...)):
         return {
             "batch_id": batch_id,
             "filename": file.filename,
+            "ai_engine": "OpenAI GPT-4o-mini",
+            "ai_engine_name": "OpenAI GPT-4o-mini",
             "total_rows": len(valid_rows),
             "status": "processing",
             "message": f"Successfully queued {len(valid_rows)} Q&A pairs for multi-agent evaluation.",

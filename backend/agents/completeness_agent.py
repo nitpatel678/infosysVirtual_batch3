@@ -7,6 +7,7 @@ def evaluate_completeness(
     reference_answer=None,
     source_document_text=None,
     retrieved_evidence=None,
+    engine="openai",
 ):
     has_reference = bool(reference_answer and reference_answer.strip())
     has_doc = bool(source_document_text and source_document_text.strip())
@@ -107,7 +108,7 @@ Return ONLY a JSON object strictly matching this schema:
   "reasoning": "Detailed justification explaining why information is considered complete, partially complete, or missing, citing specific requirements."
 }}
 """
-    result = generate_with_fallback(prompt, preferred_model="gemini-3.5-flash-lite")
+    result = generate_with_fallback(prompt, preferred_model="gemini-3.5-flash-lite", engine=engine)
     score = float(result.get("score", 3.0))
     score = min(5.0, max(1.0, score))
 
