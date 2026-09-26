@@ -797,9 +797,21 @@ def export_history_pdf(eval_id: int):
 
 
 @app.get("/api/analytics")
-def analytics(start_date: Optional[str] = None, end_date: Optional[str] = None):
+def analytics(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    verdict: Optional[str] = None,
+    engine: Optional[str] = None,
+):
     try:
-        data = get_analytics_summary(start_date=start_date, end_date=end_date)
+        data = get_analytics_summary(
+            start_date=start_date,
+            end_date=end_date,
+            batch_id=batch_id,
+            verdict_filter=verdict,
+            engine=engine,
+        )
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate analytics: {str(e)}")

@@ -62,7 +62,9 @@ function App() {
 
           {activeView === 'batch' && <BatchEvaluationModule />}
 
-          {activeView === 'analytics' && <AnalyticsDashboard />}
+          {activeView === 'analytics' && (
+            <AnalyticsDashboard onSelectEvaluation={handleSelectFromHistory} />
+          )}
 
           {activeView === 'history' && (
             <HistoryDashboard

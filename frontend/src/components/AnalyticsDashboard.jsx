@@ -18,7 +18,7 @@ import {
   Activity,
 } from 'lucide-react'
 
-export default function AnalyticsDashboard() {
+export default function AnalyticsDashboard({ onSelectEvaluation }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -28,10 +28,13 @@ export default function AnalyticsDashboard() {
   const [hoveredDonutIndex, setHoveredDonutIndex] = useState(null)
   const [hoveredRadarAxis, setHoveredRadarAxis] = useState(null)
 
-  // Range filter state
+  // Filters state
   const [rangePreset, setRangePreset] = useState('all') // 'all' | '7d' | '30d' | '90d' | 'custom'
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  const [selectedBatch, setSelectedBatch] = useState('all')
+  const [selectedVerdict, setSelectedVerdict] = useState('all')
+  const [selectedEngine, setSelectedEngine] = useState('all')
 
   useEffect(() => {
     fetchAnalytics()
@@ -56,7 +59,13 @@ export default function AnalyticsDashboard() {
     return { start: startStr, end: endStr }
   }
 
-  async function fetchAnalytics(isManualRefresh = false, overridePreset = null) {
+  async function fetchAnalytics(
+    isManualRefresh = false,
+    overridePreset = null,
+    overrideBatch = null,
+    overrideVerdict = null,
+    overrideEngine = null
+  ) {
     if (isManualRefresh) {
       setIsRefreshing(true)
     } else {
@@ -65,11 +74,18 @@ export default function AnalyticsDashboard() {
     setError('')
 
     const activePreset = overridePreset !== null ? overridePreset : rangePreset
+    const activeBatch = overrideBatch !== null ? overrideBatch : selectedBatch
+    const activeVerdict = overrideVerdict !== null ? overrideVerdict : selectedVerdict
+    const activeEngine = overrideEngine !== null ? overrideEngine : selectedEngine
+
     const { start, end } = computeDateRange(activePreset)
 
     const params = new URLSearchParams()
     if (start) params.append('start_date', start)
     if (end) params.append('end_date', end)
+    if (activeBatch && activeBatch !== 'all') params.append('batch_id', activeBatch)
+    if (activeVerdict && activeVerdict !== 'all') params.append('verdict', activeVerdict)
+    if (activeEngine && activeEngine !== 'all') params.append('engine', activeEngine)
 
     const url = `http://127.0.0.1:8000/api/analytics${params.toString() ? '?' + params.toString() : ''}`
 
@@ -93,6 +109,31 @@ export default function AnalyticsDashboard() {
     if (preset !== 'custom') {
       fetchAnalytics(false, preset)
     }
+  }
+
+  function handleBatchChange(bId) {
+    setSelectedBatch(bId)
+    fetchAnalytics(false, null, bId)
+  }
+
+  function handleVerdictChange(v) {
+    setSelectedVerdict(v)
+    fetchAnalytics(false, null, null, v)
+  }
+
+  function handleEngineChange(eng) {
+    setSelectedEngine(eng)
+    fetchAnalytics(false, null, null, null, eng)
+  }
+
+  function handleResetFilters() {
+    setRangePreset('all')
+    setCustomStart('')
+    setCustomEnd('')
+    setSelectedBatch('all')
+    setSelectedVerdict('all')
+    setSelectedEngine('all')
+    fetchAnalytics(false, 'all', 'all', 'all', 'all')
   }
 
   function handleApplyCustomRange(e) {
@@ -399,7 +440,70 @@ export default function AnalyticsDashboard() {
               : rangePreset === 'custom'
               ? `(${customStart || 'Start'} to ${customEnd || 'Now'})`
               : `(${rangePreset.toUpperCase()})`}
+            {selectedBatch !== 'all' && ` • Batch: ${selectedBatch.slice(0, 8)}...`}
+            {selectedVerdict !== 'all' && ` • Verdict: ${selectedVerdict.toUpperCase()}`}
+            {selectedEngine !== 'all' && ` • Engine: ${selectedEngine.toUpperCase()}`}
           </span>
+        </div>
+
+        {/* Secondary Filter Bar: Batch, Verdict, Engine */}
+        <div className="analytics-filters-secondary">
+          <div className="filter-select-group">
+            <span className="filter-select-label">Batch:</span>
+            <select
+              className="analytics-filter-select"
+              value={selectedBatch}
+              onChange={(e) => handleBatchChange(e.target.value)}
+            >
+              <option value="all">All Submissions & Batches</option>
+              {(summary.available_batches || []).map((b) => (
+                <option key={b.batch_id} value={b.batch_id}>
+                  {b.filename} ({b.total} rows • {b.created_at})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-select-group">
+            <span className="filter-select-label">Verdict:</span>
+            <select
+              className="analytics-filter-select"
+              value={selectedVerdict}
+              onChange={(e) => handleVerdictChange(e.target.value)}
+            >
+              <option value="all">All Verdicts</option>
+              <option value="pass">Pass</option>
+              <option value="needs">Needs Improvement</option>
+              <option value="fail">Fail</option>
+              <option value="unverified">Unverified / Closed-World</option>
+              <option value="conflict">Ground Truth Conflict</option>
+            </select>
+          </div>
+
+          <div className="filter-select-group">
+            <span className="filter-select-label">AI Engine:</span>
+            <select
+              className="analytics-filter-select"
+              value={selectedEngine}
+              onChange={(e) => handleEngineChange(e.target.value)}
+            >
+              <option value="all">All Engines</option>
+              <option value="openai">OpenAI GPT</option>
+              <option value="gemini">Google Gemini</option>
+            </select>
+          </div>
+
+          {(rangePreset !== 'all' || selectedBatch !== 'all' || selectedVerdict !== 'all' || selectedEngine !== 'all') && (
+            <button
+              type="button"
+              className="btn-filter-reset"
+              onClick={handleResetFilters}
+              title="Reset all active filters"
+            >
+              <RotateCcw size={12} />
+              <span>Reset Filters</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1204,6 +1308,356 @@ export default function AnalyticsDashboard() {
               </div>
             </div>
           </div>
+
+          {/* M4.1: Dimension Score Distributions */}
+          {summary.dimension_distributions && (
+            <div className="dashboard-section">
+              <div className="dashboard-section-header">
+                <div>
+                  <div className="dashboard-section-title">
+                    <BarChart3 size={17} className="text-accent" />
+                    <span>Dimension Score Distributions</span>
+                  </div>
+                  <p className="dashboard-section-desc">
+                    Frequency distribution of responses across 4 quality tiers (Optimal, Acceptable, Warning, Critical)
+                  </p>
+                </div>
+              </div>
+
+              <div className="score-dist-grid">
+                {[
+                  { key: 'composite', name: 'Overall Composite', avg: avgs.composite },
+                  { key: 'relevance', name: 'Relevance (25%)', avg: avgs.relevance },
+                  { key: 'accuracy', name: 'Accuracy (30%)', avg: avgs.accuracy },
+                  { key: 'hallucination', name: 'Hallucination (25%)', avg: avgs.hallucination },
+                  { key: 'completeness', name: 'Completeness (20%)', avg: avgs.completeness },
+                ].map((dim) => {
+                  const dist = summary.dimension_distributions[dim.key] || {}
+                  const totalCount = (dist.tier_4_5 || 0) + (dist.tier_3_4 || 0) + (dist.tier_2_3 || 0) + (dist.tier_1_2 || 0) || 1
+                  return (
+                    <div key={dim.key} className="score-dist-card">
+                      <div className="score-dist-card-header">
+                        <span className="score-dist-card-title">{dim.name}</span>
+                        <span className="score-dist-card-avg">{dim.avg?.toFixed(2) || '0.00'}</span>
+                      </div>
+                      <div className="dist-tiers-list">
+                        <div className="dist-tier-row">
+                          <div className="dist-tier-meta">
+                            <span className="dist-tier-label">4.0 - 5.0 (Optimal)</span>
+                            <span className="dist-tier-val">{dist.tier_4_5 || 0} ({Math.round(((dist.tier_4_5 || 0) / totalCount) * 100)}%)</span>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div className="dist-bar-fill fill-tier-optimal" style={{ width: `${((dist.tier_4_5 || 0) / totalCount) * 100}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="dist-tier-row">
+                          <div className="dist-tier-meta">
+                            <span className="dist-tier-label">3.0 - 3.9 (Acceptable)</span>
+                            <span className="dist-tier-val">{dist.tier_3_4 || 0} ({Math.round(((dist.tier_3_4 || 0) / totalCount) * 100)}%)</span>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div className="dist-bar-fill fill-tier-acceptable" style={{ width: `${((dist.tier_3_4 || 0) / totalCount) * 100}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="dist-tier-row">
+                          <div className="dist-tier-meta">
+                            <span className="dist-tier-label">2.0 - 2.9 (Warning)</span>
+                            <span className="dist-tier-val">{dist.tier_2_3 || 0} ({Math.round(((dist.tier_2_3 || 0) / totalCount) * 100)}%)</span>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div className="dist-bar-fill fill-tier-warning" style={{ width: `${((dist.tier_2_3 || 0) / totalCount) * 100}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="dist-tier-row">
+                          <div className="dist-tier-meta">
+                            <span className="dist-tier-label">1.0 - 1.9 (Critical)</span>
+                            <span className="dist-tier-val">{dist.tier_1_2 || 0} ({Math.round(((dist.tier_1_2 || 0) / totalCount) * 100)}%)</span>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div className="dist-bar-fill fill-tier-critical" style={{ width: `${((dist.tier_1_2 || 0) / totalCount) * 100}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* M4.1: Deep-Dive Diagnostics: Hallucination & Completeness */}
+          <div className="dashboard-section">
+            <div className="deep-dive-grid">
+              {/* Hallucination Deep Dive */}
+              <div className="deep-dive-card">
+                <div className="deep-dive-header">
+                  <div className="deep-dive-title">
+                    <ShieldAlert size={16} className="text-hal" />
+                    <span>Hallucination & Grounding Diagnostics</span>
+                  </div>
+                  <span className="stat-badge badge-cat-fail">{rates.hallucination_rate || 0}% Ungrounded</span>
+                </div>
+
+                <div className="deep-dive-stat-chips">
+                  <div className="deep-dive-chip">
+                    <span className="chip-label">Flagged Responses</span>
+                    <span className="chip-value text-hal">{summary.hallucinations || 0}</span>
+                  </div>
+                  <div className="deep-dive-chip">
+                    <span className="chip-label">Total Claims Flagged</span>
+                    <span className="chip-value text-accent">{summary.hallucination_breakdown?.total_flagged_claims || 0}</span>
+                  </div>
+                  <div className="deep-dive-chip">
+                    <span className="chip-label">Average Resistance</span>
+                    <span className="chip-value">{avgs.hallucination?.toFixed(2) || '0.00'}</span>
+                  </div>
+                </div>
+
+                <div className="deep-dive-sub-list">
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Severe Hallucination (Fabricated Claims)</span>
+                    <span className="sub-item-count text-fail">{summary.hallucination_breakdown?.severity_counts?.Severe || 0}</span>
+                  </div>
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Moderate Hallucination (Speculative Gaps)</span>
+                    <span className="sub-item-count text-needs">{summary.hallucination_breakdown?.severity_counts?.Moderate || 0}</span>
+                  </div>
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Minor Speculation / Zero Hallucination</span>
+                    <span className="sub-item-count text-pass">{summary.hallucination_breakdown?.severity_counts?.['Minor / Clean'] || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Completeness Deep Dive */}
+              <div className="deep-dive-card">
+                <div className="deep-dive-header">
+                  <div className="deep-dive-title">
+                    <Scale size={16} className="text-accent" />
+                    <span>Completeness & Requirement Coverage</span>
+                  </div>
+                  <span className="stat-badge badge-cat-warn">{avgs.completeness?.toFixed(2) || '0.00'} / 5.0</span>
+                </div>
+
+                <div className="deep-dive-stat-chips">
+                  <div className="deep-dive-chip">
+                    <span className="chip-label">Total Missing Aspects</span>
+                    <span className="chip-value text-needs">{summary.completeness_breakdown?.total_missing_aspects || 0}</span>
+                  </div>
+                  <div className="deep-dive-chip">
+                    <span className="chip-label">Fully Complete</span>
+                    <span className="chip-value text-pass">{summary.completeness_breakdown?.categories?.Complete || 0}</span>
+                  </div>
+                  <div className="deep-dive-chip">
+                    <span className="chip-label">Substantially Incomplete</span>
+                    <span className="chip-value text-fail">{summary.completeness_breakdown?.categories?.['Substantially Incomplete'] || 0}</span>
+                  </div>
+                </div>
+
+                <div className="deep-dive-sub-list">
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Complete Responses</span>
+                    <span className="sub-item-count text-pass">{summary.completeness_breakdown?.categories?.Complete || 0}</span>
+                  </div>
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Mostly Complete Responses</span>
+                    <span className="sub-item-count">{summary.completeness_breakdown?.categories?.['Mostly Complete'] || 0}</span>
+                  </div>
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Partially Complete Responses</span>
+                    <span className="sub-item-count text-needs">{summary.completeness_breakdown?.categories?.['Partially Complete'] || 0}</span>
+                  </div>
+                  <div className="deep-dive-sub-item">
+                    <span className="sub-item-label">Substantially Incomplete Responses</span>
+                    <span className="sub-item-count text-fail">{summary.completeness_breakdown?.categories?.['Substantially Incomplete'] || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* M4.1: Frequently Occurring Evaluation Issues */}
+          {summary.top_issues && summary.top_issues.length > 0 && (
+            <div className="dashboard-section">
+              <div className="dashboard-section-header">
+                <div>
+                  <div className="dashboard-section-title">
+                    <AlertTriangle size={17} className="text-needs" />
+                    <span>Frequently Occurring Quality Bottlenecks</span>
+                  </div>
+                  <p className="dashboard-section-desc">
+                    Ranked recurring failure modes and areas of friction identified across evaluated responses
+                  </p>
+                </div>
+              </div>
+
+              <div className="top-issues-grid">
+                {summary.top_issues.map((iss, idx) => (
+                  <div
+                    key={idx}
+                    className={`top-issue-card ${
+                      iss.severity === 'high'
+                        ? 'issue-sev-high'
+                        : iss.severity === 'medium'
+                        ? 'issue-sev-medium'
+                        : 'issue-sev-low'
+                    }`}
+                  >
+                    <div className="issue-card-header">
+                      <span className="issue-title">{iss.name}</span>
+                      <span className="issue-count-pill">{iss.count}</span>
+                    </div>
+                    <span className="issue-impact-text">
+                      Impacts <strong>{iss.pct}%</strong> of evaluated submissions
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* M4.1: Batch Quality Trends Progression Table */}
+          {summary.batch_trends && summary.batch_trends.length > 0 && (
+            <div className="dashboard-section">
+              <div className="dashboard-section-header">
+                <div>
+                  <div className="dashboard-section-title">
+                    <TrendingUp size={17} className="text-accent" />
+                    <span>Batch Quality Progression & Trends</span>
+                  </div>
+                  <p className="dashboard-section-desc">
+                    Comparative evaluation performance across historical batch submissions
+                  </p>
+                </div>
+              </div>
+
+              <div className="batch-trends-card">
+                <table className="dashboard-table">
+                  <thead>
+                    <tr>
+                      <th>Batch ID</th>
+                      <th>Dataset File</th>
+                      <th>Evaluated At</th>
+                      <th>Total Rows</th>
+                      <th>Pass Rate</th>
+                      <th>Avg Composite</th>
+                      <th>Hallucination Rate</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.batch_trends.map((b) => (
+                      <tr key={b.batch_id}>
+                        <td>
+                          <code>{b.batch_id.slice(0, 8)}...</code>
+                        </td>
+                        <td>
+                          <strong>{b.filename}</strong>
+                        </td>
+                        <td>{b.created_at}</td>
+                        <td>{b.processed || b.total}</td>
+                        <td>
+                          <span className={b.pass_rate >= 70 ? 'text-pass' : 'text-needs'}>
+                            {b.pass_rate}%
+                          </span>
+                        </td>
+                        <td>
+                          <strong>{b.avg_score?.toFixed(2)}</strong> / 5.0
+                        </td>
+                        <td>
+                          <span className={b.hallucination_rate > 15 ? 'text-fail' : 'text-secondary'}>
+                            {b.hallucination_rate}%
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-filter-batch"
+                            onClick={() => handleBatchChange(b.batch_id)}
+                          >
+                            Filter by Batch
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* M4.1: Recent Trajectory & Drill-down Navigation Table */}
+          {trajectory.length > 0 && (
+            <div className="dashboard-section">
+              <div className="dashboard-section-header">
+                <div>
+                  <div className="dashboard-section-title">
+                    <Activity size={17} className="text-accent" />
+                    <span>Recent Evaluation Trajectory (Drill-Down Inspection)</span>
+                  </div>
+                  <p className="dashboard-section-desc">
+                    Click any evaluated submission to navigate directly to its detailed audit dossier
+                  </p>
+                </div>
+              </div>
+
+              <div className="recent-drilldown-card">
+                <table className="dashboard-table">
+                  <thead>
+                    <tr>
+                      <th>Record #</th>
+                      <th>Timestamp</th>
+                      <th>Composite Score</th>
+                      <th>Verdict</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trajectory.slice(-15).reverse().map((item) => {
+                      const vLow = (item.verdict || '').toLowerCase()
+                      const isPass = vLow.includes('pass') && !vLow.includes('needs') && !vLow.includes('fail')
+                      const isNeeds = vLow.includes('needs') || vLow.includes('moderate')
+                      const isFail = vLow.includes('fail')
+                      const vClass = isPass ? 'text-pass' : isNeeds ? 'text-needs' : isFail ? 'text-fail' : 'text-accent'
+
+                      return (
+                        <tr key={item.id}>
+                          <td>
+                            <strong>#{item.id}</strong>
+                          </td>
+                          <td>{item.date || 'Recent'}</td>
+                          <td>
+                            <strong>{item.score?.toFixed(2)}</strong> / 5.00
+                          </td>
+                          <td>
+                            <span className={vClass}>{item.verdict}</span>
+                          </td>
+                          <td>
+                            {onSelectEvaluation ? (
+                              <button
+                                type="button"
+                                className="btn-drilldown"
+                                onClick={() => onSelectEvaluation(item.id)}
+                                title={`Inspect detailed audit for record #${item.id}`}
+                              >
+                                <span>Inspect Audit</span>
+                                <span>→</span>
+                              </button>
+                            ) : (
+                              <span className="text-tertiary">Audit Saved</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

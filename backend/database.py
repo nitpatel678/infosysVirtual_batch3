@@ -379,7 +379,7 @@ def get_all_batches(limit=30):
         conn.close()
 
 
-def get_analytics_summary(start_date=None, end_date=None):
+def get_analytics_summary(start_date=None, end_date=None, batch_id=None, verdict_filter=None, engine=None):
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -387,6 +387,7 @@ def get_analytics_summary(start_date=None, end_date=None):
                 SELECT 
                     id,
                     created_at,
+                    batch_id,
                     final_verdict,
                     composite_score,
                     relevance_score,
@@ -394,6 +395,7 @@ def get_analytics_summary(start_date=None, end_date=None):
                     hallucination_score,
                     completeness_score,
                     hallucination_details,
+                    completeness_details,
                     verdict_details
                 FROM evaluation_records
                 WHERE 1=1
@@ -409,10 +411,68 @@ def get_analytics_summary(start_date=None, end_date=None):
                     end_date_full = end_date
                 query += " AND created_at <= %s"
                 params.append(end_date_full)
+            if batch_id and batch_id.lower() != "all":
+                query += " AND batch_id = %s"
+                params.append(batch_id)
+            if verdict_filter and verdict_filter.lower() != "all":
+                v_f = verdict_filter.lower()
+                if v_f == "pass":
+                    query += " AND LOWER(final_verdict) LIKE '%pass%' AND LOWER(final_verdict) NOT LIKE '%needs%' AND LOWER(final_verdict) NOT LIKE '%fail%'"
+                elif v_f == "needs":
+                    query += " AND (LOWER(final_verdict) LIKE '%needs%' OR LOWER(final_verdict) LIKE '%moderate%')"
+                elif v_f == "fail":
+                    query += " AND LOWER(final_verdict) LIKE '%fail%'"
+                elif v_f == "unverified":
+                    query += " AND (LOWER(final_verdict) LIKE '%unverified%' OR LOWER(final_verdict) LIKE '%insufficient%')"
+                elif v_f == "conflict":
+                    query += " AND LOWER(final_verdict) LIKE '%conflict%'"
+            if engine and engine.lower() != "all":
+                query += " AND LOWER(COALESCE(verdict_details->>'ai_engine', 'openai')) = %s"
+                params.append(engine.lower())
 
             query += " ORDER BY created_at ASC;"
             cur.execute(query, tuple(params))
             records = cur.fetchall()
+
+            # Query all batches for dropdown filter and batch-over-batch trends
+            cur.execute("""
+                SELECT batch_id, created_at, filename, total_count, processed_count, status, statistics
+                FROM batch_evaluations
+                ORDER BY created_at DESC
+                LIMIT 25;
+            """)
+            batch_rows = cur.fetchall()
+            available_batches = []
+            batch_trends = []
+            for b in batch_rows:
+                b_stat = b.get("statistics")
+                if isinstance(b_stat, str):
+                    try:
+                        b_stat = json.loads(b_stat)
+                    except Exception:
+                        b_stat = {}
+                elif not b_stat:
+                    b_stat = {}
+
+                c_at = b.get("created_at")
+                c_str = c_at.strftime("%d %b %Y, %H:%M") if hasattr(c_at, "strftime") else str(c_at or "")
+
+                b_entry = {
+                    "batch_id": b["batch_id"],
+                    "filename": b.get("filename") or "Batch Dataset",
+                    "created_at": c_str,
+                    "total": b.get("total_count", 0),
+                    "processed": b.get("processed_count", 0),
+                    "status": b.get("status", "unknown"),
+                    "pass_rate": round(float(b_stat.get("pass_rate") or (b_stat.get("passed", 0) / max(b.get("total_count", 1), 1) * 100)), 1),
+                    "avg_score": round(float(b_stat.get("avg_overall") or 0.0), 2),
+                    "hallucination_rate": round(float(b_stat.get("hallucination_rate") or 0.0), 1),
+                }
+                available_batches.append(b_entry)
+                if b_entry["processed"] > 0:
+                    batch_trends.append(b_entry)
+
+            batch_trends = list(reversed(batch_trends))
 
             total = len(records)
             if total == 0:
@@ -440,6 +500,26 @@ def get_analytics_summary(start_date=None, end_date=None):
                     },
                     "monthly_trends": [],
                     "recent_trajectory": [],
+                    "dimension_distributions": {
+                        "composite": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                        "relevance": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                        "accuracy": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                        "hallucination": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                        "completeness": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                    },
+                    "hallucination_breakdown": {
+                        "total_detected": 0,
+                        "hallucination_rate": 0.0,
+                        "total_flagged_claims": 0,
+                        "severity_counts": {"Severe": 0, "Moderate": 0, "Minor / Clean": 0},
+                    },
+                    "completeness_breakdown": {
+                        "total_missing_aspects": 0,
+                        "categories": {"Complete": 0, "Mostly Complete": 0, "Partially Complete": 0, "Substantially Incomplete": 0},
+                    },
+                    "top_issues": [],
+                    "available_batches": available_batches,
+                    "batch_trends": batch_trends,
                 }
 
             passed = 0
@@ -458,6 +538,39 @@ def get_analytics_summary(start_date=None, end_date=None):
             from collections import defaultdict
             monthly_groups = defaultdict(lambda: {"total": 0, "passed": 0, "needs": 0, "failed": 0, "unverified": 0, "sum_score": 0.0})
 
+            # Dimension Distributions
+            dim_dist = {
+                "composite": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                "relevance": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                "accuracy": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                "hallucination": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+                "completeness": {"tier_4_5": 0, "tier_3_4": 0, "tier_2_3": 0, "tier_1_2": 0},
+            }
+
+            def _bucket(val):
+                if val >= 4.0:
+                    return "tier_4_5"
+                if val >= 3.0:
+                    return "tier_3_4"
+                if val >= 2.0:
+                    return "tier_2_3"
+                return "tier_1_2"
+
+            hal_severe = 0
+            hal_moderate = 0
+            hal_minor = 0
+            total_flagged_claims = 0
+
+            comp_cats = {"Complete": 0, "Mostly Complete": 0, "Partially Complete": 0, "Substantially Incomplete": 0}
+            total_missing_aspects = 0
+
+            # Issue Counters
+            count_low_acc = 0
+            count_hal = 0
+            count_incomp = 0
+            count_irrel = 0
+            count_conflict = 0
+
             recent_trajectory = []
 
             for r in records:
@@ -474,6 +587,12 @@ def get_analytics_summary(start_date=None, end_date=None):
                 sum_hal += h_score
                 sum_com += co_score
 
+                dim_dist["composite"][_bucket(c_score)] += 1
+                dim_dist["relevance"][_bucket(r_score)] += 1
+                dim_dist["accuracy"][_bucket(a_score)] += 1
+                dim_dist["hallucination"][_bucket(h_score)] += 1
+                dim_dist["completeness"][_bucket(co_score)] += 1
+
                 is_pass = "pass" in v and "needs" not in v and "fail" not in v
                 is_needs = "needs" in v or "moderate" in v
                 is_unver = "unverified" in v or "insufficient" in v or "more info" in v
@@ -488,24 +607,76 @@ def get_analytics_summary(start_date=None, end_date=None):
                 else:
                     failed += 1
 
-
-                hal_details = r["hallucination_details"] or {}
+                # Hallucination breakdown
+                hal_details = r.get("hallucination_details") or {}
                 if isinstance(hal_details, str):
                     try:
                         hal_details = json.loads(hal_details)
                     except Exception:
                         hal_details = {}
-                if hal_details.get("hallucination_detected", False) or (hal_details.get("hallucination_count", 0) > 0) or h_score < 3.0:
+                hal_detected = hal_details.get("hallucination_detected", False) or (hal_details.get("hallucination_count", 0) > 0) or h_score < 3.0
+                if hal_detected:
                     hallucinations += 1
+                    count_hal += 1
 
-                verd_details = r["verdict_details"] or {}
+                flagged_list = hal_details.get("flagged_claims") or []
+                total_flagged_claims += len(flagged_list)
+
+                hal_level = str(hal_details.get("hallucination_level", "")).lower()
+                if "severe" in hal_level or h_score < 2.5:
+                    hal_severe += 1
+                elif "moderate" in hal_level or h_score < 3.5:
+                    hal_moderate += 1
+                else:
+                    hal_minor += 1
+
+                # Completeness breakdown
+                comp_details = r.get("completeness_details") or {}
+                if isinstance(comp_details, str):
+                    try:
+                        comp_details = json.loads(comp_details)
+                    except Exception:
+                        comp_details = {}
+
+                missing_list = comp_details.get("missing_aspects") or []
+                total_missing_aspects += len(missing_list)
+                if len(missing_list) > 0 or co_score < 3.0:
+                    count_incomp += 1
+
+                c_cat = comp_details.get("completeness_category", "")
+                if "substantially" in c_cat.lower():
+                    comp_cats["Substantially Incomplete"] += 1
+                elif "partially" in c_cat.lower():
+                    comp_cats["Partially Complete"] += 1
+                elif "mostly" in c_cat.lower():
+                    comp_cats["Mostly Complete"] += 1
+                elif "complete" in c_cat.lower():
+                    comp_cats["Complete"] += 1
+                else:
+                    if co_score >= 4.5:
+                        comp_cats["Complete"] += 1
+                    elif co_score >= 3.5:
+                        comp_cats["Mostly Complete"] += 1
+                    elif co_score >= 2.5:
+                        comp_cats["Partially Complete"] += 1
+                    else:
+                        comp_cats["Substantially Incomplete"] += 1
+
+                # Verdict / Conflicts
+                verd_details = r.get("verdict_details") or {}
                 if isinstance(verd_details, str):
                     try:
                         verd_details = json.loads(verd_details)
                     except Exception:
                         verd_details = {}
-                if verd_details.get("source_conflict_detected", False):
+                if verd_details.get("source_conflict_detected", False) or is_conflict:
                     conflicts += 1
+                    count_conflict += 1
+
+                if a_score < 3.0:
+                    count_low_acc += 1
+                if r_score < 3.5:
+                    count_irrel += 1
 
                 created = r["created_at"]
                 month_key = created.strftime("%b %Y") if hasattr(created, "strftime") else "Current"
@@ -540,6 +711,16 @@ def get_analytics_summary(start_date=None, end_date=None):
                     "avg_score": round(m_data["sum_score"] / m_data["total"], 2),
                 })
 
+            # Ranked top recurring issues
+            all_issues = [
+                {"name": "Factual Inaccuracies (Accuracy < 3.0)", "count": count_low_acc, "pct": round((count_low_acc / total) * 100, 1), "severity": "high"},
+                {"name": "Hallucinated / Unsupported Claims", "count": count_hal, "pct": round((count_hal / total) * 100, 1), "severity": "high"},
+                {"name": "Incomplete Coverage of Sub-Questions", "count": count_incomp, "pct": round((count_incomp / total) * 100, 1), "severity": "medium"},
+                {"name": "Query Irrelevance / Off-Topic (Score < 3.5)", "count": count_irrel, "pct": round((count_irrel / total) * 100, 1), "severity": "medium"},
+                {"name": "Ground Truth Contradiction Discrepancy", "count": count_conflict, "pct": round((count_conflict / total) * 100, 1), "severity": "low"},
+            ]
+            all_issues.sort(key=lambda x: x["count"], reverse=True)
+
             return {
                 "total": total,
                 "passed": passed,
@@ -562,8 +743,26 @@ def get_analytics_summary(start_date=None, end_date=None):
                     "hallucination": round(sum_hal / total, 2),
                     "completeness": round(sum_com / total, 2),
                 },
+                "dimension_distributions": dim_dist,
+                "hallucination_breakdown": {
+                    "total_detected": hallucinations,
+                    "hallucination_rate": round((hallucinations / total) * 100, 1),
+                    "total_flagged_claims": total_flagged_claims,
+                    "severity_counts": {
+                        "Severe": hal_severe,
+                        "Moderate": hal_moderate,
+                        "Minor / Clean": hal_minor,
+                    },
+                },
+                "completeness_breakdown": {
+                    "total_missing_aspects": total_missing_aspects,
+                    "categories": comp_cats,
+                },
+                "top_issues": all_issues,
                 "monthly_trends": monthly_trends,
                 "recent_trajectory": recent_trajectory[-30:],
+                "available_batches": available_batches,
+                "batch_trends": batch_trends,
             }
     finally:
         conn.close()

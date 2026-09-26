@@ -304,7 +304,7 @@ def build_evaluation_pdf(record: dict) -> bytes:
         ],
         [
             Paragraph("<b>Accuracy Judge</b>", table_cell_bold),
-            Paragraph("35%", table_cell),
+            Paragraph("30%", table_cell),
             Paragraph(f"<b>{acc_score:.1f}</b> / 5.0", table_cell),
             Paragraph(acc_cat, table_cell),
             Paragraph(record.get('accuracy_reasoning') or acc_details.get('reasoning', ''), table_cell),
@@ -318,7 +318,7 @@ def build_evaluation_pdf(record: dict) -> bytes:
         ],
         [
             Paragraph("<b>Completeness Judge</b>", table_cell_bold),
-            Paragraph("15%", table_cell),
+            Paragraph("20%", table_cell),
             Paragraph(f"<b>{comp_score:.1f}</b> / 5.0", table_cell),
             Paragraph(comp_cat, table_cell),
             Paragraph(record.get('completeness_reasoning') or comp_details.get('reasoning', ''), table_cell),
@@ -710,9 +710,9 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
         [
             Paragraph("Overall Composite", table_header),
             Paragraph("Relevance (25%)", table_header),
-            Paragraph("Accuracy (35%)", table_header),
+            Paragraph("Accuracy (30%)", table_header),
             Paragraph("Hallucination (25%)", table_header),
-            Paragraph("Completeness (15%)", table_header),
+            Paragraph("Completeness (20%)", table_header),
         ],
         [
             Paragraph(f"<b>{avg_over:.2f} / 5.00</b>", table_cell),
@@ -858,9 +858,9 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
         dim_data = [
             [
                 Paragraph("<b>Relevance (25%)</b>", dim_cell_style),
-                Paragraph("<b>Accuracy (35%)</b>", dim_cell_style),
+                Paragraph("<b>Accuracy (30%)</b>", dim_cell_style),
                 Paragraph("<b>Hallucination (25%)</b>", dim_cell_style),
-                Paragraph("<b>Completeness (15%)</b>", dim_cell_style),
+                Paragraph("<b>Completeness (20%)</b>", dim_cell_style),
             ],
             [
                 Paragraph(f"<b>{rel_sc:.1f}</b> / 5.0", dim_cell_style),
@@ -934,6 +934,77 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
         story.append(KeepTogether([entry_card, Spacer(1, 10)]))
 
     story.append(Spacer(1, 6))
+
+    # 4. Actionable Quality Improvement Recommendations (M4.2 Requirement)
+    story.append(Paragraph("4. Actionable Quality Improvement Recommendations", section_heading))
+    story.append(Paragraph(
+        "Automated diagnostic recommendations synthesized by the evaluation system based on recurring weaknesses identified across this evaluated batch:",
+        subtitle_style
+    ))
+    story.append(Spacer(1, 6))
+
+    recommendations = []
+    if hal_pct > 15.0:
+        recommendations.append((
+            "High Hallucination Frequency Alert",
+            f"Detected ungrounded assertions in {hal_pct}% of responses. Implement stricter system prompt constraints instructing the model to decline answering when facts are not attested, and reduce inference temperature to <= 0.2."
+        ))
+    elif hal_pct > 0:
+        recommendations.append((
+            "Minor Hallucination Mitigation",
+            f"Detected occasional unsupported claims ({hal_pct}% frequency). Require explicit page/source citations for all statistical assertions and proper names."
+        ))
+    else:
+        recommendations.append((
+            "Clean Hallucination Profile",
+            "Zero hallucinations detected across this evaluated batch. Maintain current closed-world grounding parameters."
+        ))
+
+    if avg_acc < 3.5:
+        recommendations.append((
+            "Factual Accuracy Remediation",
+            f"Average accuracy ({avg_acc:.2f}/5.00) indicates frequent factual discrepancies against ground truth. Enrich the reference knowledge base and verify ingestion coverage for target domain topics."
+        ))
+
+    if avg_comp < 3.5:
+        recommendations.append((
+            "Response Completeness Enhancement",
+            f"Average completeness ({avg_comp:.2f}/5.00) shows recurring omissions of required sub-questions. Introduce structured output templates (e.g. multi-step checklists) to enforce exhaustive coverage."
+        ))
+
+    if conflict_count > 0:
+        recommendations.append((
+            "Ground Truth Source Reconciliation",
+            f"Found {conflict_count} contradiction(s) between uploaded reference answers and retrieved benchmark knowledge. Audit contradictory sources to establish a single authoritative ground truth."
+        ))
+
+    if pass_pct >= 80.0:
+        recommendations.append((
+            "Production Readiness Status",
+            f"Batch achieved a strong {pass_pct}% Pass Rate ({avg_over:.2f}/5.00 composite). The validated AI response generation pipeline meets deployment quality thresholds."
+        ))
+    else:
+        recommendations.append((
+            "Pre-Deployment Optimization Needed",
+            f"Current Pass Rate ({pass_pct}%) falls below the recommended 80% production deployment benchmark. Address flagged entries before production release."
+        ))
+
+    rec_rows = []
+    for rec_title, rec_desc in recommendations:
+        rec_rows.append([
+            Paragraph(f"<b>• {xml_escape(rec_title)}</b><br/><font color='#334155'>{xml_escape(rec_desc)}</font>", table_cell)
+        ])
+
+    t_rec = Table(rec_rows, colWidths=[540])
+    t_rec.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 0.75, colors.HexColor('#93c5fd')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(t_rec)
+    story.append(Spacer(1, 14))
 
     # 5. Sign-off & Audit Stamp
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#cbd5e1'), spaceAfter=8))
