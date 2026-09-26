@@ -33,7 +33,11 @@ def evaluate_accuracy(
 1. DO NOT use external world knowledge or pre-training memory to verify facts.
 2. Evaluate factual assertions SOLELY based on the provided Reference Ground Truth, Source Document Excerpt, or Retrieved Benchmark Grounding Chunks.
 3. If an assertion is not verifiable from the provided context, mark its verdict as "Unverified" rather than assuming it is true.
-4. Check if the Reference Ground Truth directly CONTRADICTS the Retrieved Benchmark Evidence. If so, set "contradiction_detected": true and detail the conflict."""
+4. Check if the Reference Ground Truth directly CONTRADICTS the Retrieved Benchmark Evidence. If so, set "contradiction_detected": true and detail the conflict.
+5. SOURCE DOCUMENT ANALYSIS & PAGE CITATIONS:
+   - When Source Document Excerpts with page references (e.g. [Page X]) are provided, thoroughly verify claims against those passages.
+   - Explicitly cite the page number in verified_claims and evidence_citations (e.g. "Source Document Page 14").
+   - If a claim directly contradicts the source document, classify it as "Incorrect" or "Contradictory"."""
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks, 1):
@@ -51,7 +55,7 @@ def evaluate_accuracy(
 
     source_doc_excerpt = ""
     if source_document_text:
-        source_doc_excerpt = source_document_text[:3000].strip()
+        source_doc_excerpt = source_document_text[:4500].strip()
 
     prompt = f"""
 You are the Accuracy Judge Agent in an AI Response Validation System.

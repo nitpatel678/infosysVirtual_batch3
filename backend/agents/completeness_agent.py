@@ -35,7 +35,8 @@ def evaluate_completeness(
 2. If a Reference Ground Truth is available, use it to identify all expected information that should be covered by the AI response.
 3. If no Reference Ground Truth is available, use the Retrieved Benchmark Evidence and Source Document Excerpt to determine the necessary components of a complete response.
 4. Check for Source Conflict: If the Reference Answer and the Retrieved Benchmark Evidence prescribe contradictory requirements or facts, set "source_conflict_detected": true and detail the discrepancy.
-5. Identify specific omissions, unanswered sub-questions, missing explanations, or insufficiently covered aspects."""
+5. Identify specific omissions, unanswered sub-questions, missing explanations, or insufficiently covered aspects.
+6. SOURCE DOCUMENT COVERAGE: If a Source Document with page excerpts is provided, evaluate whether the response addresses the pertinent information and findings from those excerpts needed to answer the query."""
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks[:5], 1):
@@ -51,7 +52,7 @@ def evaluate_completeness(
             evidence_text += f"  Ground Truth: {ans}\n"
         evidence_text += f"  Context: {ctx[:400]}\n\n"
 
-    source_doc_excerpt = source_document_text[:2000].strip() if has_doc else ""
+    source_doc_excerpt = source_document_text[:4500].strip() if has_doc else ""
 
     prompt = f"""
 You are the Completeness Judge Agent in an AI Response Validation System.

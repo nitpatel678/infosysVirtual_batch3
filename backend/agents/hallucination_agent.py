@@ -39,7 +39,11 @@ def evaluate_hallucination(
    - "Unsupported": Claim lacks grounding evidence in the provided context.
    - "Fabricated": Introduces fictitious entities, made-up statistics, or validates debunked myths.
    - "Contradictory": Directly conflicts with known facts in the reference or benchmark chunks.
-6. Provide an explicit explanation for WHY each flagged statement is considered unsupported, fabricated, or contradictory."""
+6. Provide an explicit explanation for WHY each flagged statement is considered unsupported, fabricated, or contradictory.
+7. SOURCE DOCUMENT VERIFICATION:
+   - When Source Document Excerpts with page references (e.g. [Page X]) are provided, rigorously cross-examine claims against them.
+   - Assertions directly supported by the source document are NOT hallucinations.
+   - Claims that state fabricated details or figures contradicting the source document must be flagged with the specific page discrepancy."""
 
     evidence_text = ""
     for idx, ev in enumerate(valid_chunks, 1):
@@ -57,7 +61,7 @@ def evaluate_hallucination(
 
     source_doc_excerpt = ""
     if source_document_text:
-        source_doc_excerpt = source_document_text[:3000].strip()
+        source_doc_excerpt = source_document_text[:4500].strip()
 
     prompt = f"""
 You are the Hallucination Detection Agent in an AI Response Validation System.

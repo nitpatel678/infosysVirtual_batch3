@@ -317,6 +317,71 @@
   color: #ff8080;
 }
 
+.pdf-helper-tip {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 5px;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.context-item-source-doc {
+  grid-column: 1 / -1;
+}
+
+.source-doc-display {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-doc-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.source-doc-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.source-meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tag-pages {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.tag-cited {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.tag-strategy {
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+}
+
 .submit-action-row {
   display: flex;
   justify-content: flex-end;

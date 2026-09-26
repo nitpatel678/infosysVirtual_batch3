@@ -105,6 +105,7 @@ def evaluate(
 
     source_doc_name = None
     source_doc_text = None
+    source_doc_metadata = None
 
     if source_document and source_document.filename:
         filename = source_document.filename
@@ -114,15 +115,16 @@ def evaluate(
         source_doc_name = filename
         try:
             content = source_document.file.read()
-            pdf_reader = pypdf.PdfReader(io.BytesIO(content))
-            extracted_pages = []
-            for page in pdf_reader.pages:
-                text = page.extract_text()
-                if text:
-                    extracted_pages.append(text)
-            source_doc_text = "\n\n".join(extracted_pages).strip()
-            if not source_doc_text:
-                source_doc_text = None
+            from pdf_processor import extract_relevant_pdf_context
+            source_doc_text, source_doc_metadata = extract_relevant_pdf_context(
+                pdf_bytes=content,
+                filename=filename,
+                query=trimmed_question,
+                ai_response=trimmed_response,
+                max_chars=3800,
+            )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to parse PDF document: {str(e)}")
 
@@ -219,6 +221,7 @@ def evaluate(
         "verdict_summary": verdict_summary,
         "ai_engine": norm_engine,
         "ai_engine_name": "OpenAI GPT-4o-mini" if norm_engine == "openai" else "Google Gemini 1.5",
+        "source_doc_metadata": source_doc_metadata,
     }
 
     saved_record = None
@@ -255,11 +258,13 @@ def evaluate(
         "created_at": str(saved_record.get("created_at")) if saved_record else None,
         "ai_engine": norm_engine,
         "ai_engine_name": "OpenAI GPT-4o-mini" if norm_engine == "openai" else "Google Gemini 1.5",
+        "source_doc_metadata": source_doc_metadata,
         "input": {
             "question": trimmed_question,
             "ai_response": trimmed_response,
             "reference_answer": trimmed_reference,
             "source_document_name": source_doc_name,
+            "source_doc_metadata": source_doc_metadata,
         },
         "retrieved_evidence": retrieved_evidence,
         "scores": {

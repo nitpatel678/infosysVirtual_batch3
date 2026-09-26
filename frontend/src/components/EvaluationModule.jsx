@@ -126,7 +126,9 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
             ai_response: rec.ai_response,
             reference_answer: rec.reference_answer,
             source_document_name: rec.source_document_name,
+            source_doc_metadata: rec.verdict_details?.source_doc_metadata || null,
           },
+          source_doc_metadata: rec.verdict_details?.source_doc_metadata || null,
           retrieved_evidence: rec.retrieved_evidence || [],
           scores: {
             relevance: {
@@ -403,6 +405,9 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <span>Choose PDF Document</span>
                 </button>
               )}
+              <span className="pdf-helper-tip">
+                ⚡ Supports 100+ pages • Automatic query-aware page indexing & BM25 retrieval
+              </span>
             </div>
           </div>
         </div>
@@ -536,9 +541,32 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
               )}
 
               {results.input.source_document_name && (
-                <div className="context-item">
+                <div className="context-item context-item-source-doc">
                   <span className="context-label">Source Document:</span>
-                  <p className="context-value">{results.input.source_document_name}</p>
+                  <div className="source-doc-display">
+                    <span className="source-doc-title">
+                      <FileText size={14} />
+                      {results.input.source_document_name}
+                    </span>
+                    {(results.source_doc_metadata || results.input.source_doc_metadata || results.verdict?.source_doc_metadata) && (() => {
+                      const meta = results.source_doc_metadata || results.input.source_doc_metadata || results.verdict?.source_doc_metadata
+                      return (
+                        <div className="source-doc-meta-tags">
+                          <span className="source-meta-tag tag-pages">
+                            {meta.total_pages} Page{meta.total_pages > 1 ? 's' : ''} ({meta.total_chunks || meta.retrieved_chunks_count} Chunks)
+                          </span>
+                          {meta.pages_referenced && meta.pages_referenced.length > 0 && (
+                            <span className="source-meta-tag tag-cited">
+                              Pages Cited: {meta.pages_referenced.join(', ')}
+                            </span>
+                          )}
+                          <span className="source-meta-tag tag-strategy">
+                            {meta.strategy || 'BM25 Page-Aware Chunking'}
+                          </span>
+                        </div>
+                      )
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
