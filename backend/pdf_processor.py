@@ -232,32 +232,11 @@ def extract_relevant_pdf_context(
 
     total_chars = sum(len(txt) for _, txt in pages_data)
 
-    # Strategy A: Short document (<= 2800 chars, e.g. 1-2 pages) -> Retain full document
-    if total_chars <= 2800:
-        sections = [
-            f"=== SOURCE DOCUMENT: {filename} ({total_pages} Page{'s' if total_pages > 1 else ''}) ==="
-        ]
-        pages_ref = []
-        for p_num, p_text in pages_data:
-            pages_ref.append(p_num)
-            sections.append(f"[Source Document Excerpt (Page {p_num})]:\n{p_text}")
-
-        formatted_output = "\n\n".join(sections).strip()
-        metadata = {
-            "filename": filename,
-            "total_pages": total_pages,
-            "total_chunks": len(pages_data),
-            "retrieved_chunks_count": len(pages_data),
-            "pages_referenced": pages_ref,
-            "strategy": f"Complete Document Ingest ({total_pages} page{'s' if total_pages > 1 else ''})",
-        }
-        return formatted_output, metadata
-
-    # Strategy B: Large document (3 to 100+ pages) -> BM25 Query-Aware Chunking
+    # Chunk pages into semantic passage units
     all_chunks: List[Dict] = []
     chunk_counter = 0
     for p_num, p_text in pages_data:
-        p_chunks = _chunk_page_text(p_num, p_text, chunk_size=800, overlap=100)
+        p_chunks = _chunk_page_text(p_num, p_text, chunk_size=650, overlap=80)
         for c in p_chunks:
             chunk_counter += 1
             c["chunk_id"] = chunk_counter
@@ -266,53 +245,62 @@ def extract_relevant_pdf_context(
     if not all_chunks:
         raise HTTPException(status_code=400, detail="Could not produce text chunks from uploaded PDF.")
 
-    # Initialize BM25 ranker
-    bm25 = LightweightBM25(all_chunks)
+    # If the document has only 1 tiny chunk, use it directly
+    if len(all_chunks) == 1:
+        selected = all_chunks
+    else:
+        # Initialize BM25 ranker for relevance-based filtering
+        bm25 = LightweightBM25(all_chunks)
 
-    # Tokenize targets
-    query_tokens = Counter(_tokenize(query))
-    resp_tokens = Counter(_tokenize(ai_response))
+        query_tokens = Counter(_tokenize(query))
+        resp_tokens = Counter(_tokenize(ai_response))
 
-    # Extract salient 2-3 word phrases from user query for phrase matching boost
-    clean_query = re.sub(r"[^\w\s]", "", query).strip()
-    q_words = clean_query.split()
-    exact_phrases = []
-    if len(q_words) >= 2:
-        for i in range(len(q_words) - 1):
-            exact_phrases.append(f"{q_words[i]} {q_words[i+1]}".lower())
+        clean_query = re.sub(r"[^\w\s]", "", query).strip()
+        q_words = clean_query.split()
+        exact_phrases = []
+        if len(q_words) >= 2:
+            for i in range(len(q_words) - 1):
+                exact_phrases.append(f"{q_words[i]} {q_words[i+1]}".lower())
 
-    # Score each chunk
-    scored_chunks = []
-    for c in all_chunks:
-        score = bm25.score_chunk(c, query_tokens, resp_tokens, exact_phrases)
-        scored_chunks.append((score, c))
+        # Score every chunk against query & AI response claims
+        scored_chunks = []
+        for c in all_chunks:
+            score = bm25.score_chunk(c, query_tokens, resp_tokens, exact_phrases)
+            scored_chunks.append((score, c))
 
-    # Sort descending by score
-    scored_chunks.sort(key=lambda x: x[0], reverse=True)
+        scored_chunks.sort(key=lambda x: x[0], reverse=True)
 
-    # Pick top chunks respecting character budget
-    selected: List[Dict] = []
-    cur_chars = 0
-    for score, chunk in scored_chunks:
-        # If score is negligible and we already have some chunks, stop
-        if score <= 0.05 and len(selected) >= 3:
-            break
-        chunk_len = len(chunk["text"])
-        if cur_chars + chunk_len > max_chars and len(selected) >= 2:
-            break
-        selected.append(chunk)
-        cur_chars += chunk_len
-        if len(selected) >= 6:
-            break
+        # Token-saving adaptive budget:
+        # For 1-2 page documents: max 2 relevant chunks (~1200 chars max)
+        # For 3+ page documents: max 4 relevant chunks (~2800 chars max)
+        if total_pages <= 2:
+            target_char_budget = min(max_chars, 1400)
+            max_chunks_allowed = 2
+        else:
+            target_char_budget = min(max_chars, 2800)
+            max_chunks_allowed = 4
 
-    # Fallback if no lexical matches found (e.g. abstract or numerical table)
-    if not selected:
-        selected = all_chunks[:3]
+        selected = []
+        cur_chars = 0
+        for score, chunk in scored_chunks:
+            # Drop irrelevant chunks if we already found matching context
+            if score <= 0.05 and len(selected) >= 1:
+                break
+            c_len = len(chunk["text"])
+            if cur_chars + c_len > target_char_budget and len(selected) >= 1:
+                break
+            selected.append(chunk)
+            cur_chars += c_len
+            if len(selected) >= max_chunks_allowed:
+                break
+
+        # Fallback to single top chunk if no lexical match found
+        if not selected:
+            selected = [scored_chunks[0][1]] if scored_chunks else all_chunks[:1]
 
     # Reorder selected chunks by natural page & chunk sequence
     selected.sort(key=lambda c: (c["page"], c["chunk_id"]))
 
-    # Group and clean chunks by page
     pages_referenced = sorted(list(set(c["page"] for c in selected)))
     
     sections = [

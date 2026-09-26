@@ -405,9 +405,6 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
                   <span>Choose PDF Document</span>
                 </button>
               )}
-              <span className="pdf-helper-tip">
-                ⚡ Supports 100+ pages • Automatic query-aware page indexing & BM25 retrieval
-              </span>
             </div>
           </div>
         </div>

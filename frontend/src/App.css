@@ -317,17 +317,6 @@
   color: #ff8080;
 }
 
-.pdf-helper-tip {
-  display: block;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin-top: 5px;
-  font-style: italic;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .context-item-source-doc {
   grid-column: 1 / -1;
 }
