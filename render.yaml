@@ -8,6 +8,8 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: USE_DB_RETRIEVAL
         value: "true"
       - key: DATABASE_URL
