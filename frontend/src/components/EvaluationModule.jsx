@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import EvidenceCard from './EvidenceCard'
 import PipelineTracker from './PipelineTracker'
+import { API_BASE_URL } from '../config/api'
 
 function formatInline(text) {
   if (!text) return null
@@ -108,7 +109,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/history/${id}`)
+      const res = await fetch(`${API_BASE_URL}/api/history/${id}`)
       if (!res.ok) {
         throw new Error('Failed to load evaluation details from database')
       }
@@ -226,7 +227,7 @@ export default function EvaluationModule({ selectedEvalId, onClearSelectedEval }
         setStepMessage('All 4 Judge Agents evaluating concurrently in parallel...')
       }, 800)
 
-      const evalRes = await fetch('http://127.0.0.1:8000/api/evaluate', {
+      const evalRes = await fetch(`${API_BASE_URL}/api/evaluate`, {
         method: 'POST',
         body: formData,
       })

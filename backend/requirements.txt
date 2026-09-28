@@ -10,3 +10,7 @@ psycopg2-binary==2.9.12
 pypdf==6.16.2
 python-multipart==0.0.32
 sqlalchemy==2.0.52
+openai>=1.40.0
+reportlab>=4.2.0
+python-docx>=1.1.0
+

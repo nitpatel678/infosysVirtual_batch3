@@ -16,7 +16,9 @@ import {
   PieChart,
   Target,
   Activity,
+  Scale,
 } from 'lucide-react'
+import { API_BASE_URL } from '../config/api'
 
 export default function AnalyticsDashboard({ onSelectEvaluation }) {
   const [data, setData] = useState(null)
@@ -87,7 +89,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
     if (activeVerdict && activeVerdict !== 'all') params.append('verdict', activeVerdict)
     if (activeEngine && activeEngine !== 'all') params.append('engine', activeEngine)
 
-    const url = `http://127.0.0.1:8000/api/analytics${params.toString() ? '?' + params.toString() : ''}`
+    const url = `${API_BASE_URL}/api/analytics${params.toString() ? '?' + params.toString() : ''}`
 
     try {
       const res = await fetch(url)
@@ -341,7 +343,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
       {/* Header and Controls */}
       <div className="analytics-header-row flex-between">
         <div>
-          <h2 className="analytics-title">Analytics & Historical Insights</h2>
+          <h2 className="analytics-title">Evaluation Scoring Dashboard</h2>
           <p className="analytics-subtitle">
             Quantitative analysis of all AI evaluations, scoring trends, hallucination frequency, and performance metrics.
           </p>
@@ -354,52 +356,44 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
           title="Refresh analytics data"
         >
           <RotateCcw size={14} className={isRefreshing ? 'spin-icon' : ''} />
-          <span>{isRefreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+          <span>{isRefreshing ? 'Refreshing...' : 'Refresh Metrics'}</span>
         </button>
       </div>
 
-      {/* Range Filter Controls Bar */}
-      <div className="analytics-range-bar">
-        <div className="range-presets-group">
-          <div className="range-label">
-            <Filter size={14} />
-            <span>Time Range:</span>
+      {/* Unified Analytics Command / Filter Bar */}
+      <div className="analytics-command-panel">
+        <div className="command-row-top">
+          <div className="range-presets-group">
+            <div className="range-label">
+              <Calendar size={14} className="text-accent" />
+              <span>Timeline:</span>
+            </div>
+            {['all', '7d', '30d', '90d', 'custom'].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`range-pill ${rangePreset === preset ? 'active' : ''}`}
+                onClick={() => handlePresetChange(preset)}
+              >
+                {preset === 'all'
+                  ? 'All Time'
+                  : preset === '7d'
+                  ? 'Last 7 Days'
+                  : preset === '30d'
+                  ? 'Last 30 Days'
+                  : preset === '90d'
+                  ? 'Last 90 Days'
+                  : 'Custom'}
+              </button>
+            ))}
           </div>
-          <button
-            type="button"
-            className={`range-pill ${rangePreset === 'all' ? 'active' : ''}`}
-            onClick={() => handlePresetChange('all')}
-          >
-            All Time
-          </button>
-          <button
-            type="button"
-            className={`range-pill ${rangePreset === '7d' ? 'active' : ''}`}
-            onClick={() => handlePresetChange('7d')}
-          >
-            Last 7 Days
-          </button>
-          <button
-            type="button"
-            className={`range-pill ${rangePreset === '30d' ? 'active' : ''}`}
-            onClick={() => handlePresetChange('30d')}
-          >
-            Last 30 Days
-          </button>
-          <button
-            type="button"
-            className={`range-pill ${rangePreset === '90d' ? 'active' : ''}`}
-            onClick={() => handlePresetChange('90d')}
-          >
-            Last 90 Days
-          </button>
-          <button
-            type="button"
-            className={`range-pill ${rangePreset === 'custom' ? 'active' : ''}`}
-            onClick={() => handlePresetChange('custom')}
-          >
-            Custom Range
-          </button>
+
+          <div className="range-active-info">
+            <Info size={13} className="text-secondary" />
+            <span>
+              Auditing <strong>{summary.total || 0}</strong> certified responses
+            </span>
+          </div>
         </div>
 
         {rangePreset === 'custom' && (
@@ -432,65 +426,52 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
           </form>
         )}
 
-        <div className="range-active-info">
-          <span>
-            Showing <strong>{summary.total || 0}</strong> records{' '}
-            {rangePreset === 'all'
-              ? '(All Time)'
-              : rangePreset === 'custom'
-              ? `(${customStart || 'Start'} to ${customEnd || 'Now'})`
-              : `(${rangePreset.toUpperCase()})`}
-            {selectedBatch !== 'all' && ` • Batch: ${selectedBatch.slice(0, 8)}...`}
-            {selectedVerdict !== 'all' && ` • Verdict: ${selectedVerdict.toUpperCase()}`}
-            {selectedEngine !== 'all' && ` • Engine: ${selectedEngine.toUpperCase()}`}
-          </span>
-        </div>
+        <div className="command-row-bottom">
+          <div className="command-filter-items">
+            <div className="filter-select-group">
+              <span className="filter-select-label">Batch:</span>
+              <select
+                className="analytics-filter-select"
+                value={selectedBatch}
+                onChange={(e) => handleBatchChange(e.target.value)}
+              >
+                <option value="all">All Evaluation Batches</option>
+                {(summary.available_batches || []).map((b) => (
+                  <option key={b.batch_id} value={b.batch_id}>
+                    {b.filename} ({b.total} rows • {b.created_at})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Secondary Filter Bar: Batch, Verdict, Engine */}
-        <div className="analytics-filters-secondary">
-          <div className="filter-select-group">
-            <span className="filter-select-label">Batch:</span>
-            <select
-              className="analytics-filter-select"
-              value={selectedBatch}
-              onChange={(e) => handleBatchChange(e.target.value)}
-            >
-              <option value="all">All Submissions & Batches</option>
-              {(summary.available_batches || []).map((b) => (
-                <option key={b.batch_id} value={b.batch_id}>
-                  {b.filename} ({b.total} rows • {b.created_at})
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="filter-select-group">
+              <span className="filter-select-label">Verdict:</span>
+              <select
+                className="analytics-filter-select"
+                value={selectedVerdict}
+                onChange={(e) => handleVerdictChange(e.target.value)}
+              >
+                <option value="all">All Verdicts</option>
+                <option value="pass">Pass Only</option>
+                <option value="needs">Needs Improvement</option>
+                <option value="fail">Fail Only</option>
+                <option value="unverified">Unverified / Insufficient Evidence</option>
+                <option value="conflict">Ground Truth Conflicts</option>
+              </select>
+            </div>
 
-          <div className="filter-select-group">
-            <span className="filter-select-label">Verdict:</span>
-            <select
-              className="analytics-filter-select"
-              value={selectedVerdict}
-              onChange={(e) => handleVerdictChange(e.target.value)}
-            >
-              <option value="all">All Verdicts</option>
-              <option value="pass">Pass</option>
-              <option value="needs">Needs Improvement</option>
-              <option value="fail">Fail</option>
-              <option value="unverified">Unverified / Closed-World</option>
-              <option value="conflict">Ground Truth Conflict</option>
-            </select>
-          </div>
-
-          <div className="filter-select-group">
-            <span className="filter-select-label">AI Engine:</span>
-            <select
-              className="analytics-filter-select"
-              value={selectedEngine}
-              onChange={(e) => handleEngineChange(e.target.value)}
-            >
-              <option value="all">All Engines</option>
-              <option value="openai">OpenAI GPT</option>
-              <option value="gemini">Google Gemini</option>
-            </select>
+            <div className="filter-select-group">
+              <span className="filter-select-label">Model Engine:</span>
+              <select
+                className="analytics-filter-select"
+                value={selectedEngine}
+                onChange={(e) => handleEngineChange(e.target.value)}
+              >
+                <option value="all">All AI Engines</option>
+                <option value="openai">OpenAI GPT-4o-mini</option>
+                <option value="gemini">Google Gemini 1.5</option>
+              </select>
+            </div>
           </div>
 
           {(rangePreset !== 'all' || selectedBatch !== 'all' || selectedVerdict !== 'all' || selectedEngine !== 'all') && (
@@ -501,7 +482,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
               title="Reset all active filters"
             >
               <RotateCcw size={12} />
-              <span>Reset Filters</span>
+              <span>Reset Active Filters</span>
             </button>
           )}
         </div>
@@ -1335,7 +1316,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
                   const dist = summary.dimension_distributions[dim.key] || {}
                   const totalCount = (dist.tier_4_5 || 0) + (dist.tier_3_4 || 0) + (dist.tier_2_3 || 0) + (dist.tier_1_2 || 0) || 1
                   return (
-                    <div key={dim.key} className="score-dist-card">
+                    <div key={dim.key} className={`score-dist-card card-dim-${dim.key}`}>
                       <div className="score-dist-card-header">
                         <span className="score-dist-card-title">{dim.name}</span>
                         <span className="score-dist-card-avg">{dim.avg?.toFixed(2) || '0.00'}</span>
@@ -1392,7 +1373,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
           <div className="dashboard-section">
             <div className="deep-dive-grid">
               {/* Hallucination Deep Dive */}
-              <div className="deep-dive-card">
+              <div className="deep-dive-card card-deep-hal">
                 <div className="deep-dive-header">
                   <div className="deep-dive-title">
                     <ShieldAlert size={16} className="text-hal" />
@@ -1433,7 +1414,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
               </div>
 
               {/* Completeness Deep Dive */}
-              <div className="deep-dive-card">
+              <div className="deep-dive-card card-deep-comp">
                 <div className="deep-dive-header">
                   <div className="deep-dive-title">
                     <Scale size={16} className="text-accent" />

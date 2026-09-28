@@ -24,6 +24,7 @@ import {
   Zap,
   Sparkles,
 } from 'lucide-react'
+import { API_BASE_URL } from '../config/api'
 
 function safeNum(val, fallback = 0) {
   if (val === null || val === undefined || val === '') return fallback
@@ -567,7 +568,7 @@ export default function BatchEvaluationModule() {
       formData.append('file', csvFile)
       formData.append('ai_engine', aiEngine)
 
-      const res = await fetch('http://127.0.0.1:8000/api/evaluate/batch', {
+      const res = await fetch(`${API_BASE_URL}/api/evaluate/batch`, {
         method: 'POST',
         body: formData,
       })
@@ -593,7 +594,7 @@ export default function BatchEvaluationModule() {
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/evaluate/batch/${id}/status`)
+        const res = await fetch(`${API_BASE_URL}/api/evaluate/batch/${id}/status`)
         if (!res.ok) return
         const data = await res.json()
         setBatchData(data)
@@ -624,7 +625,7 @@ export default function BatchEvaluationModule() {
   }
 
   function handleDownloadSample() {
-    window.location.href = 'http://127.0.0.1:8000/api/sample-csv'
+    window.location.href = `${API_BASE_URL}/api/sample-csv`
   }
 
   function exportResultsCsv() {
@@ -678,7 +679,7 @@ export default function BatchEvaluationModule() {
     if (!id) return
     try {
       setDownloadingPdf(true)
-      const res = await fetch(`http://127.0.0.1:8000/api/history/batch/${id}/export-pdf`)
+      const res = await fetch(`${API_BASE_URL}/api/history/batch/${id}/export-pdf`)
       if (!res.ok) {
         throw new Error('Failed to generate batch PDF report.')
       }

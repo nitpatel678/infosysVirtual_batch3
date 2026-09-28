@@ -25,6 +25,7 @@ import {
   FileSpreadsheet,
   GitCompare,
 } from 'lucide-react'
+import { API_BASE_URL } from '../config/api'
 
 function safeParse(val, fallback = {}) {
   if (!val) return fallback
@@ -57,11 +58,16 @@ function getCategoryBadgeClass(category) {
   return 'badge-cat-neutral'
 }
 
-export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
+export default function HistoryDashboard({
+  initialRecordId = null,
+  onClearInitialRecord,
+  onSelectEvaluation,
+  onBackToForm,
+}) {
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedRecordId, setSelectedRecordId] = useState(null)
+  const [selectedRecordId, setSelectedRecordId] = useState(initialRecordId)
   const [recordDetail, setRecordDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
@@ -72,7 +78,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     if (!evalId) return
     try {
       setDownloadingPdf(true)
-      const res = await fetch(`http://127.0.0.1:8000/api/history/${evalId}/export-pdf`)
+      const res = await fetch(`${API_BASE_URL}/api/history/${evalId}/export-pdf`)
       if (!res.ok) {
         throw new Error('Failed to generate PDF audit report.')
       }
@@ -101,7 +107,7 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     if (!batchId) return
     try {
       setDownloadingBatchId(batchId)
-      const res = await fetch(`http://127.0.0.1:8000/api/history/batch/${batchId}/export-pdf`)
+      const res = await fetch(`${API_BASE_URL}/api/history/batch/${batchId}/export-pdf`)
       if (!res.ok) {
         throw new Error('Failed to generate batch PDF report.')
       }
@@ -134,8 +140,8 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     setError('')
     try {
       const [resRecords, resBatches] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/history?limit=100'),
-        fetch('http://127.0.0.1:8000/api/history/batches?limit=30'),
+        fetch(`${API_BASE_URL}/api/history?limit=100`),
+        fetch(`${API_BASE_URL}/api/history/batches?limit=30`),
       ])
       if (!resRecords.ok) {
         throw new Error('Failed to fetch evaluation records from database')
@@ -156,14 +162,17 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
 
   useEffect(() => {
     fetchHistory()
-  }, [])
+    if (initialRecordId) {
+      handleViewRecord(initialRecordId)
+    }
+  }, [initialRecordId])
 
   async function handleViewRecord(id) {
     setSelectedRecordId(id)
     setDetailLoading(true)
     setDetailError('')
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/history/${id}`)
+      const res = await fetch(`${API_BASE_URL}/api/history/${id}`)
       if (!res.ok) {
         throw new Error('Failed to load evaluation record details')
       }
@@ -180,6 +189,9 @@ export default function HistoryDashboard({ onSelectEvaluation, onBackToForm }) {
     setSelectedRecordId(null)
     setRecordDetail(null)
     setDetailError('')
+    if (onClearInitialRecord) {
+      onClearInitialRecord()
+    }
   }
 
   function formatDate(isoStr) {

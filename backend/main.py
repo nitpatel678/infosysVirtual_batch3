@@ -47,7 +47,8 @@ def startup_event():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -63,7 +64,33 @@ class RetrieveRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {"status": "running"}
+    return {
+        "status": "running",
+        "service": "SentryAI - AI Response Validation Platform",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/api/health")
+def api_health():
+    """Health check endpoint for Render pinging / uptime monitors (e.g. UptimeRobot)."""
+    db_status = "ok"
+    try:
+        from database import get_connection
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+        conn.close()
+    except Exception as e:
+        db_status = f"database connection error: {str(e)}"
+
+    return {
+        "status": "healthy" if db_status == "ok" else "degraded",
+        "service": "SentryAI Backend",
+        "database": db_status,
+        "mode": "cloud_db_retrieval" if (os.getenv("USE_DB_RETRIEVAL", "").lower() in ("1", "true") or os.getenv("RENDER") is not None) else "hybrid",
+        "timestamp": time.time(),
+    }
 
 
 @app.post("/api/retrieve")
@@ -447,31 +474,35 @@ def _run_batch_worker(batch_id: str, rows: list):
                 "verdict_summary": summary,
             }
 
-            saved = save_evaluation(
-                question=q,
-                ai_response=ans,
-                reference_answer=ref,
-                source_document_name=row.get("source_name", "Batch CSV"),
-                source_document_text=src_info,
-                relevance_score=rel_score,
-                relevance_reasoning=str(rel_data.get("reasoning", "")),
-                accuracy_score=acc_score,
-                accuracy_reasoning=str(acc_data.get("reasoning", "")),
-                hallucination_score=hal_score,
-                hallucination_reasoning=str(hal_data.get("reasoning", "")),
-                completeness_score=comp_score,
-                completeness_reasoning=str(comp_data.get("reasoning", "")),
-                composite_score=overall_score,
-                final_verdict=verdict,
-                verdict_summary=summary,
-                retrieved_evidence=ev_list,
-                relevance_details=relevance_details,
-                accuracy_details=accuracy_details,
-                hallucination_details=hallucination_details,
-                completeness_details=completeness_details,
-                verdict_details=verdict_details,
-                batch_id=batch_id,
-            )
+            saved = None
+            try:
+                saved = save_evaluation(
+                    question=q,
+                    ai_response=ans,
+                    reference_answer=ref,
+                    source_document_name=row.get("source_name", "Batch CSV"),
+                    source_document_text=src_info,
+                    relevance_score=rel_score,
+                    relevance_reasoning=str(rel_data.get("reasoning", "")),
+                    accuracy_score=acc_score,
+                    accuracy_reasoning=str(acc_data.get("reasoning", "")),
+                    hallucination_score=hal_score,
+                    hallucination_reasoning=str(hal_data.get("reasoning", "")),
+                    completeness_score=comp_score,
+                    completeness_reasoning=str(comp_data.get("reasoning", "")),
+                    composite_score=overall_score,
+                    final_verdict=verdict,
+                    verdict_summary=summary,
+                    retrieved_evidence=ev_list,
+                    relevance_details=relevance_details,
+                    accuracy_details=accuracy_details,
+                    hallucination_details=hallucination_details,
+                    completeness_details=completeness_details,
+                    verdict_details=verdict_details,
+                    batch_id=batch_id,
+                )
+            except Exception as db_save_err:
+                print(f"Warning: Failed to persist batch row {idx} to DB: {db_save_err}", flush=True)
 
             eval_rec = {
                 "id": saved.get("id") if saved else idx,

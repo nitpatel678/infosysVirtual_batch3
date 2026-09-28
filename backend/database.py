@@ -53,6 +53,7 @@ def init_db():
                 ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS completeness_details JSONB;
                 ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS verdict_details JSONB;
                 ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS batch_id VARCHAR(64);
+                ALTER TABLE evaluation_records ALTER COLUMN final_verdict TYPE VARCHAR(100);
 
                 CREATE TABLE IF NOT EXISTS batch_evaluations (
                     batch_id VARCHAR(64) PRIMARY KEY,
@@ -60,10 +61,11 @@ def init_db():
                     filename TEXT,
                     total_count INT NOT NULL DEFAULT 0,
                     processed_count INT NOT NULL DEFAULT 0,
-                    status VARCHAR(20) NOT NULL DEFAULT 'processing',
+                    status VARCHAR(50) NOT NULL DEFAULT 'processing',
                     statistics JSONB,
                     error TEXT
                 );
+                ALTER TABLE batch_evaluations ALTER COLUMN status TYPE VARCHAR(50);
             """)
             conn.commit()
     finally:
@@ -141,7 +143,7 @@ def save_evaluation(
                 completeness_score,
                 completeness_reasoning,
                 composite_score,
-                final_verdict,
+                str(final_verdict)[:100] if final_verdict else "Pass",
                 verdict_summary,
                 json.dumps(retrieved_evidence or []),
                 json.dumps(relevance_details or {}),

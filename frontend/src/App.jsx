@@ -6,6 +6,45 @@ import AnalyticsDashboard from './components/AnalyticsDashboard'
 import HistoryDashboard from './components/HistoryDashboard'
 import './App.css'
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('UI Render Error caught by ErrorBoundary:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-card" style={{ margin: '40px auto', maxWidth: '720px', padding: '24px' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#f87171', fontSize: '16px' }}>
+            An unexpected error occurred while rendering this module
+          </h3>
+          <p style={{ color: '#cbd5e1', fontSize: '13px', margin: '0 0 16px 0' }}>
+            {this.state.error?.message || 'Error loading view.'}
+          </p>
+          <button
+            type="button"
+            className="btn-analytics-refresh"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ width: 'fit-content' }}
+          >
+            Reload View
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function App() {
   const [activeView, setActiveView] = useState('evaluate')
   const [selectedEvalId, setSelectedEvalId] = useState(null)
@@ -19,6 +58,11 @@ function App() {
   function handleSelectFromHistory(evalId) {
     setSelectedEvalId(evalId)
     setActiveView('evaluate')
+  }
+
+  function handleInspectFromAnalytics(evalId) {
+    setSelectedEvalId(evalId)
+    setActiveView('history')
   }
 
   function handleClearSelected() {
@@ -53,25 +97,29 @@ function App() {
         </header>
 
         <main className="content-container">
-          {activeView === 'evaluate' && (
-            <EvaluationModule
-              selectedEvalId={selectedEvalId}
-              onClearSelectedEval={handleClearSelected}
-            />
-          )}
+          <ErrorBoundary key={activeView}>
+            {activeView === 'evaluate' && (
+              <EvaluationModule
+                selectedEvalId={selectedEvalId}
+                onClearSelectedEval={handleClearSelected}
+              />
+            )}
 
-          {activeView === 'batch' && <BatchEvaluationModule />}
+            {activeView === 'batch' && <BatchEvaluationModule />}
 
-          {activeView === 'analytics' && (
-            <AnalyticsDashboard onSelectEvaluation={handleSelectFromHistory} />
-          )}
+            {activeView === 'analytics' && (
+              <AnalyticsDashboard onSelectEvaluation={handleInspectFromAnalytics} />
+            )}
 
-          {activeView === 'history' && (
-            <HistoryDashboard
-              onSelectEvaluation={handleSelectFromHistory}
-              onBackToForm={() => setActiveView('evaluate')}
-            />
-          )}
+            {activeView === 'history' && (
+              <HistoryDashboard
+                initialRecordId={selectedEvalId}
+                onClearInitialRecord={handleClearSelected}
+                onSelectEvaluation={handleSelectFromHistory}
+                onBackToForm={() => setActiveView('evaluate')}
+              />
+            )}
+          </ErrorBoundary>
         </main>
 
         <footer className="footer">
