@@ -63,6 +63,7 @@ class RetrieveRequest(BaseModel):
 
 
 @app.get("/")
+@app.head("/")
 def root():
     return {
         "status": "running",
@@ -72,6 +73,7 @@ def root():
 
 
 @app.get("/api/health")
+@app.head("/api/health")
 def api_health():
     """Health check endpoint for Render pinging / uptime monitors (e.g. UptimeRobot)."""
     db_status = "ok"
@@ -106,7 +108,6 @@ def api_retrieve(request: RetrieveRequest):
         return {"query": query, "top_k": top_k, "results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Retrieval error: {str(e)}")
-
 
 @app.post("/api/evaluate")
 def evaluate(
