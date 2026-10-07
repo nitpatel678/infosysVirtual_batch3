@@ -109,23 +109,23 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
   function handlePresetChange(preset) {
     setRangePreset(preset)
     if (preset !== 'custom') {
-      fetchAnalytics(false, preset)
+      fetchAnalytics(false, preset, selectedBatch, selectedVerdict, selectedEngine)
     }
   }
 
   function handleBatchChange(bId) {
     setSelectedBatch(bId)
-    fetchAnalytics(false, null, bId)
+    fetchAnalytics(false, rangePreset, bId, selectedVerdict, selectedEngine)
   }
 
   function handleVerdictChange(v) {
     setSelectedVerdict(v)
-    fetchAnalytics(false, null, null, v)
+    fetchAnalytics(false, rangePreset, selectedBatch, v, selectedEngine)
   }
 
   function handleEngineChange(eng) {
     setSelectedEngine(eng)
-    fetchAnalytics(false, null, null, null, eng)
+    fetchAnalytics(false, rangePreset, selectedBatch, selectedVerdict, eng)
   }
 
   function handleResetFilters() {
@@ -428,49 +428,70 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
 
         <div className="command-row-bottom">
           <div className="command-filter-items">
-            <div className="filter-select-group">
-              <span className="filter-select-label">Batch:</span>
-              <select
-                className="analytics-filter-select"
-                value={selectedBatch}
-                onChange={(e) => handleBatchChange(e.target.value)}
-              >
-                <option value="all">All Evaluation Batches</option>
-                {(summary.available_batches || []).map((b) => (
-                  <option key={b.batch_id} value={b.batch_id}>
-                    {b.filename} ({b.total} rows • {b.created_at})
-                  </option>
-                ))}
-              </select>
+            {/* Batch Filter Pill */}
+            <div className={`filter-select-group ${selectedBatch !== 'all' ? 'filter-active-pill' : ''}`}>
+              <div className="filter-label-wrapper">
+                <Layers size={13} className="filter-pill-icon text-indigo" />
+                <span className="filter-select-label">Batch:</span>
+              </div>
+              <div className="custom-select-wrapper">
+                <select
+                  className="analytics-filter-select"
+                  value={selectedBatch}
+                  onChange={(e) => handleBatchChange(e.target.value)}
+                >
+                  <option value="all">All Evaluation Batches</option>
+                  {(summary.available_batches || []).map((b) => (
+                    <option key={b.batch_id} value={b.batch_id}>
+                      {b.filename} ({b.total} rows • {b.created_at})
+                    </option>
+                  ))}
+                </select>
+                <span className="select-chevron-icon">▾</span>
+              </div>
             </div>
 
-            <div className="filter-select-group">
-              <span className="filter-select-label">Verdict:</span>
-              <select
-                className="analytics-filter-select"
-                value={selectedVerdict}
-                onChange={(e) => handleVerdictChange(e.target.value)}
-              >
-                <option value="all">All Verdicts</option>
-                <option value="pass">Pass Only</option>
-                <option value="needs">Needs Improvement</option>
-                <option value="fail">Fail Only</option>
-                <option value="unverified">Unverified / Insufficient Evidence</option>
-                <option value="conflict">Ground Truth Conflicts</option>
-              </select>
+            {/* Verdict / Category Filter Pill */}
+            <div className={`filter-select-group ${selectedVerdict !== 'all' ? 'filter-active-pill' : ''}`}>
+              <div className="filter-label-wrapper">
+                <Scale size={13} className="filter-pill-icon text-emerald" />
+                <span className="filter-select-label">Verdict:</span>
+              </div>
+              <div className="custom-select-wrapper">
+                <select
+                  className="analytics-filter-select"
+                  value={selectedVerdict}
+                  onChange={(e) => handleVerdictChange(e.target.value)}
+                >
+                  <option value="all">All Verdicts</option>
+                  <option value="pass">Pass Only</option>
+                  <option value="needs">Needs Improvement</option>
+                  <option value="fail">Fail Only</option>
+                  <option value="unverified">Unverified / Insufficient Evidence</option>
+                  <option value="conflict">Ground Truth Conflicts</option>
+                </select>
+                <span className="select-chevron-icon">▾</span>
+              </div>
             </div>
 
-            <div className="filter-select-group">
-              <span className="filter-select-label">Model Engine:</span>
-              <select
-                className="analytics-filter-select"
-                value={selectedEngine}
-                onChange={(e) => handleEngineChange(e.target.value)}
-              >
-                <option value="all">All AI Engines</option>
-                <option value="openai">OpenAI GPT-4o-mini</option>
-                <option value="gemini">Google Gemini 1.5</option>
-              </select>
+            {/* Model Engine Filter Pill */}
+            <div className={`filter-select-group ${selectedEngine !== 'all' ? 'filter-active-pill' : ''}`}>
+              <div className="filter-label-wrapper">
+                <Sparkles size={13} className="filter-pill-icon text-amber" />
+                <span className="filter-select-label">Model Engine:</span>
+              </div>
+              <div className="custom-select-wrapper">
+                <select
+                  className="analytics-filter-select"
+                  value={selectedEngine}
+                  onChange={(e) => handleEngineChange(e.target.value)}
+                >
+                  <option value="all">All AI Engines</option>
+                  <option value="openai">OpenAI GPT-4o-mini</option>
+                  <option value="gemini">Google Gemini 1.5</option>
+                </select>
+                <span className="select-chevron-icon">▾</span>
+              </div>
             </div>
           </div>
 
@@ -635,11 +656,13 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
                   <svg
                     viewBox={`0 0 ${chartWidth} ${chartHeight}`}
                     className="trajectory-svg"
+                    width="100%"
+                    height="220"
                     preserveAspectRatio="none"
                   >
                     <defs>
                       <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
+                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0.45" />
                         <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
                       </linearGradient>
                       <linearGradient id="curveLineGrad" x1="0" y1="0" x2="1" y2="0">
@@ -695,11 +718,37 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
                       stroke="#22c55e"
                       strokeWidth="1.5"
                       strokeDasharray="4,4"
-                      opacity="0.6"
+                      opacity="0.75"
                     />
 
                     {/* Shaded area */}
                     {areaD && <path d={areaD} fill="url(#scoreAreaGrad)" />}
+
+                    {/* Single Point Guideline Fallback */}
+                    {points.length === 1 && (
+                      <g>
+                        <line
+                          x1={paddingX}
+                          y1={points[0].y}
+                          x2={chartWidth - paddingX}
+                          y2={points[0].y}
+                          stroke="#818cf8"
+                          strokeWidth="2"
+                          strokeDasharray="4,4"
+                          opacity="0.85"
+                        />
+                        <text
+                          x={points[0].x}
+                          y={points[0].y - 12}
+                          fill="#c7d2fe"
+                          fontSize="11"
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          Single Run: {points[0].score} / 5.0
+                        </text>
+                      </g>
+                    )}
 
                     {/* Smooth bezier curve */}
                     {pathD && (
@@ -707,7 +756,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
                         d={pathD}
                         fill="none"
                         stroke="url(#curveLineGrad)"
-                        strokeWidth="3"
+                        strokeWidth="3.2"
                         strokeLinecap="round"
                       />
                     )}
@@ -815,6 +864,8 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
                   <svg
                     viewBox={`0 0 ${barChartWidth} ${barChartHeight}`}
                     className="monthly-bar-svg"
+                    width="100%"
+                    height="200"
                     preserveAspectRatio="none"
                   >
                     {/* Grid lines */}
@@ -984,7 +1035,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
 
               <div className="radar-layout-body">
                 <div className="radar-svg-wrapper">
-                  <svg viewBox="0 0 420 310" className="radar-svg">
+                  <svg viewBox="0 0 420 310" className="radar-svg" width="100%" height="280">
                     <defs>
                       <radialGradient id="radarAreaGrad" cx="50%" cy="50%" r="50%">
                         <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
@@ -1132,7 +1183,7 @@ export default function AnalyticsDashboard({ onSelectEvaluation }) {
                   {donutTotal === 0 ? (
                     <div className="no-data-hint">No evaluation data available</div>
                   ) : (
-                    <svg viewBox="0 0 280 280" className="donut-svg">
+                    <svg viewBox="0 0 280 280" className="donut-svg" width="100%" height="260">
                       {donutArcs.map((arc, i) => {
                         const isHovered = hoveredDonutIndex === i
                         return (

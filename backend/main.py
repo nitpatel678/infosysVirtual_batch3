@@ -277,6 +277,7 @@ def evaluate(
             hallucination_details=hallucination_details,
             completeness_details=completeness_details,
             verdict_details=verdict_details,
+            ai_engine=norm_engine,
         )
     except Exception as e:
         print(f"Warning: Failed to save to database: {e}")
@@ -323,7 +324,7 @@ def evaluate(
     }
 
 
-def _run_batch_worker(batch_id: str, rows: list):
+def _run_batch_worker(batch_id: str, rows: list, ai_engine: str = "openai"):
     total = len(rows)
     records = []
     stats = {
@@ -377,14 +378,13 @@ def _run_batch_worker(batch_id: str, rows: list):
                 except Exception as re:
                     print(f"Batch row {idx} retrieval error: {re}")
 
-                # Batch ALWAYS evaluates strictly via OpenAI gpt-4o-mini to guarantee zero quota freezing
                 eval_res = evaluate_response(
                     question=q,
                     ai_response=ans,
                     reference_answer=ref,
                     source_document_text=src_info,
                     retrieved_evidence=ev_list,
-                    engine="openai",
+                    engine=ai_engine,
                 )
                 break
             except Exception as e:
@@ -501,6 +501,7 @@ def _run_batch_worker(batch_id: str, rows: list):
                     completeness_details=completeness_details,
                     verdict_details=verdict_details,
                     batch_id=batch_id,
+                    ai_engine=ai_engine,
                 )
             except Exception as db_save_err:
                 print(f"Warning: Failed to persist batch row {idx} to DB: {db_save_err}", flush=True)
@@ -531,7 +532,7 @@ def _run_batch_worker(batch_id: str, rows: list):
                 "hallucination_details": hallucination_details,
                 "completeness_details": completeness_details,
                 "verdict_details": verdict_details,
-                "ai_engine": "OpenAI GPT-4o-mini",
+                "ai_engine": "Google Gemini 1.5" if "gemini" in str(ai_engine).lower() else "OpenAI GPT-4o-mini",
             }
         else:
             err_str = str(last_error or "Unknown error")
@@ -653,12 +654,15 @@ def evaluate_batch(
 
         batch_id = str(uuid.uuid4())[:8]
 
+        clean_engine = (ai_engine or "openai").strip().lower()
+        engine_display = "Google Gemini 1.5" if "gemini" in clean_engine else "OpenAI GPT-4o-mini"
+
         with _batch_lock:
             _batch_cache[batch_id] = {
                 "batch_id": batch_id,
                 "filename": file.filename,
-                "ai_engine": "OpenAI GPT-4o-mini",
-                "ai_engine_name": "OpenAI GPT-4o-mini",
+                "ai_engine": clean_engine,
+                "ai_engine_name": engine_display,
                 "total_count": len(valid_rows),
                 "processed_count": 0,
                 "status": "processing",
@@ -680,18 +684,18 @@ def evaluate_batch(
                     "avg_hallucination": 0.0,
                     "avg_completeness": 0.0,
                     "avg_overall": 0.0,
-                    "ai_engine": "OpenAI GPT-4o-mini",
+                    "ai_engine": engine_display,
                 },
             }
 
         try:
-            create_batch_job(batch_id, file.filename, len(valid_rows))
+            create_batch_job(batch_id, file.filename, len(valid_rows), ai_engine=clean_engine)
         except Exception as dbe:
             print(f"Batch DB creation note: {dbe}")
 
         worker_thread = threading.Thread(
             target=_run_batch_worker,
-            args=(batch_id, valid_rows),
+            args=(batch_id, valid_rows, clean_engine),
             daemon=True,
         )
         worker_thread.start()
@@ -699,8 +703,8 @@ def evaluate_batch(
         return {
             "batch_id": batch_id,
             "filename": file.filename,
-            "ai_engine": "OpenAI GPT-4o-mini",
-            "ai_engine_name": "OpenAI GPT-4o-mini",
+            "ai_engine": clean_engine,
+            "ai_engine_name": engine_display,
             "total_rows": len(valid_rows),
             "status": "processing",
             "message": f"Successfully queued {len(valid_rows)} Q&A pairs for multi-agent evaluation.",

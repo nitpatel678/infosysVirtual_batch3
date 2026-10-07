@@ -624,10 +624,6 @@ export default function BatchEvaluationModule() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  function handleDownloadSample() {
-    window.location.href = `${API_BASE_URL}/api/sample-csv`
-  }
-
   function exportResultsCsv() {
     if (!batchData || !batchData.records || batchData.records.length === 0) return
 
@@ -740,17 +736,6 @@ export default function BatchEvaluationModule() {
               Upload CSV containing multiple question-answer pairs to evaluate relevance, accuracy, hallucination, completeness, and final verdicts automatically.
             </p>
           </div>
-        </div>
-        <div className="batch-header-actions">
-          <button
-            type="button"
-            className="btn-download-sample"
-            onClick={handleDownloadSample}
-            title="Download formatted benchmark CSV sample"
-          >
-            <Download size={14} />
-            <span>Download Sample CSV</span>
-          </button>
         </div>
       </div>
 

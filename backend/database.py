@@ -53,6 +53,7 @@ def init_db():
                 ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS completeness_details JSONB;
                 ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS verdict_details JSONB;
                 ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS batch_id VARCHAR(64);
+                ALTER TABLE evaluation_records ADD COLUMN IF NOT EXISTS ai_engine VARCHAR(64);
                 ALTER TABLE evaluation_records ALTER COLUMN final_verdict TYPE VARCHAR(100);
 
                 CREATE TABLE IF NOT EXISTS batch_evaluations (
@@ -63,8 +64,10 @@ def init_db():
                     processed_count INT NOT NULL DEFAULT 0,
                     status VARCHAR(50) NOT NULL DEFAULT 'processing',
                     statistics JSONB,
-                    error TEXT
+                    error TEXT,
+                    ai_engine VARCHAR(64)
                 );
+                ALTER TABLE batch_evaluations ADD COLUMN IF NOT EXISTS ai_engine VARCHAR(64);
                 ALTER TABLE batch_evaluations ALTER COLUMN status TYPE VARCHAR(50);
             """)
             conn.commit()
@@ -96,9 +99,19 @@ def save_evaluation(
     completeness_details=None,
     verdict_details=None,
     batch_id=None,
+    ai_engine=None,
 ):
     conn = get_connection()
     try:
+        norm_engine = "openai"
+        if ai_engine and str(ai_engine).strip():
+            norm_engine = str(ai_engine).strip().lower()
+        elif verdict_details and isinstance(verdict_details, dict) and verdict_details.get("ai_engine"):
+            norm_engine = str(verdict_details["ai_engine"]).strip().lower()
+
+        if verdict_details and isinstance(verdict_details, dict):
+            verdict_details["ai_engine"] = norm_engine
+
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 INSERT INTO evaluation_records (
@@ -124,9 +137,10 @@ def save_evaluation(
                     hallucination_details,
                     completeness_details,
                     verdict_details,
-                    batch_id
+                    batch_id,
+                    ai_engine
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 ) RETURNING *;
             """, (
                 question,
@@ -152,6 +166,7 @@ def save_evaluation(
                 json.dumps(completeness_details or {}),
                 json.dumps(verdict_details or {}),
                 batch_id,
+                norm_engine,
             ))
             row = cur.fetchone()
             conn.commit()
@@ -255,15 +270,16 @@ def get_evaluation_by_id(eval_id):
         conn.close()
 
 
-def create_batch_job(batch_id, filename, total_count):
+def create_batch_job(batch_id, filename, total_count, ai_engine="openai"):
     conn = get_connection()
     try:
+        norm_engine = str(ai_engine or "openai").strip().lower()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                INSERT INTO batch_evaluations (batch_id, filename, total_count, processed_count, status)
-                VALUES (%s, %s, %s, 0, 'processing')
+                INSERT INTO batch_evaluations (batch_id, filename, total_count, processed_count, status, ai_engine)
+                VALUES (%s, %s, %s, 0, 'processing', %s)
                 RETURNING *;
-            """, (batch_id, filename, total_count))
+            """, (batch_id, filename, total_count, norm_engine))
             row = cur.fetchone()
             conn.commit()
             return dict(row)
@@ -417,20 +433,33 @@ def get_analytics_summary(start_date=None, end_date=None, batch_id=None, verdict
                 query += " AND batch_id = %s"
                 params.append(batch_id)
             if verdict_filter and verdict_filter.lower() != "all":
-                v_f = verdict_filter.lower()
+                v_f = verdict_filter.lower().strip()
                 if v_f == "pass":
-                    query += " AND LOWER(final_verdict) LIKE '%pass%' AND LOWER(final_verdict) NOT LIKE '%needs%' AND LOWER(final_verdict) NOT LIKE '%fail%'"
+                    query += " AND LOWER(final_verdict) LIKE %s AND LOWER(final_verdict) NOT LIKE %s AND LOWER(final_verdict) NOT LIKE %s"
+                    params.extend(["%pass%", "%needs%", "%fail%"])
                 elif v_f == "needs":
-                    query += " AND (LOWER(final_verdict) LIKE '%needs%' OR LOWER(final_verdict) LIKE '%moderate%')"
+                    query += " AND (LOWER(final_verdict) LIKE %s OR LOWER(final_verdict) LIKE %s)"
+                    params.extend(["%needs%", "%moderate%"])
                 elif v_f == "fail":
-                    query += " AND LOWER(final_verdict) LIKE '%fail%'"
+                    query += " AND LOWER(final_verdict) LIKE %s"
+                    params.append("%fail%")
                 elif v_f == "unverified":
-                    query += " AND (LOWER(final_verdict) LIKE '%unverified%' OR LOWER(final_verdict) LIKE '%insufficient%')"
+                    query += " AND (LOWER(final_verdict) LIKE %s OR LOWER(final_verdict) LIKE %s)"
+                    params.extend(["%unverified%", "%insufficient%"])
                 elif v_f == "conflict":
-                    query += " AND LOWER(final_verdict) LIKE '%conflict%'"
+                    query += " AND LOWER(final_verdict) LIKE %s"
+                    params.append("%conflict%")
             if engine and engine.lower() != "all":
-                query += " AND LOWER(COALESCE(verdict_details->>'ai_engine', 'openai')) = %s"
-                params.append(engine.lower())
+                eng_clean = engine.lower().strip()
+                if "gemini" in eng_clean:
+                    query += " AND (LOWER(COALESCE(ai_engine, verdict_details->>'ai_engine', '')) LIKE %s)"
+                    params.append("%gemini%")
+                elif "openai" in eng_clean or "gpt" in eng_clean:
+                    query += " AND (LOWER(COALESCE(ai_engine, verdict_details->>'ai_engine', 'openai')) LIKE %s OR LOWER(COALESCE(ai_engine, '')) NOT LIKE %s)"
+                    params.extend(["%openai%", "%gemini%"])
+                else:
+                    query += " AND (LOWER(COALESCE(ai_engine, verdict_details->>'ai_engine', '')) = %s)"
+                    params.append(eng_clean)
 
             query += " ORDER BY created_at ASC;"
             cur.execute(query, tuple(params))

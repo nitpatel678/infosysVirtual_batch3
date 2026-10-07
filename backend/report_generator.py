@@ -41,6 +41,46 @@ def xml_escape(text):
     )
 
 
+from reportlab.pdfgen import canvas
+
+
+class NumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, total_pages):
+        self.saveState()
+        self.setFont("Helvetica", 7.5)
+        self.setFillColor(colors.HexColor("#64748b"))
+        # Running top header for pages > 1
+        if self._pageNumber > 1:
+            self.drawString(36, 762, "SentryAI • Multi-Agent Response Validation & Audit Report")
+            self.drawRightString(612 - 36, 762, "Infosys Springboard Batch 3 • Milestone 4")
+            self.setStrokeColor(colors.HexColor("#cbd5e1"))
+            self.setLineWidth(0.5)
+            self.line(36, 756, 612 - 36, 756)
+        # Running bottom footer
+        self.setStrokeColor(colors.HexColor("#cbd5e1"))
+        self.setLineWidth(0.5)
+        self.line(36, 32, 612 - 36, 32)
+        self.drawString(36, 22, "Lead Auditor: Nitin Patel • Strict Closed-World Grounding Framework")
+        self.drawRightString(612 - 36, 22, f"Page {self._pageNumber} of {total_pages}")
+        self.restoreState()
+
+
 def build_evaluation_pdf(record: dict) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -149,13 +189,24 @@ def build_evaluation_pdf(record: dict) -> bytes:
         else str(created_at or datetime.now().strftime("%B %d, %Y"))
     )
 
+    # Parse JSON detail fields safely
+    rel_details = safe_parse(record.get('relevance_details'))
+    acc_details = safe_parse(record.get('accuracy_details'))
+    hal_details = safe_parse(record.get('hallucination_details'))
+    comp_details = safe_parse(record.get('completeness_details'))
+    verd_details = safe_parse(record.get('verdict_details'))
+    evidence_list = safe_parse(record.get('retrieved_evidence'), [])
+
+    engine_raw = record.get('ai_engine') or verd_details.get('ai_engine') or 'openai'
+    display_engine = "Google Gemini 1.5" if "gemini" in str(engine_raw).lower() else "OpenAI GPT-4o-mini"
+
     header_data = [
         [
-            Paragraph("<b>INFOSYS SPRINGBOARD • AI QUALITY AUDITOR</b><br/><font size=8 color='#64748b'>Milestone 3 Quality Assurance & Verification System</font>", title_style),
-            Paragraph(f"<para align=right><b>Audit Record #{eval_id}</b><br/><font size=8 color='#64748b'>{date_str}</font></para>", subtitle_style)
+            Paragraph("<b>SENTRYAI • AI RESPONSE VALIDATION PLATFORM</b><br/><font size=8 color='#64748b'>Infosys Springboard Virtual Internship Batch 3 • Milestone 4 Evaluation Dossier</font>", title_style),
+            Paragraph(f"<para align=right><b>Audit Record #{eval_id}</b><br/><font size=8 color='#64748b'>{date_str}</font><br/><font size=8 color='#4f46e5'><b>Audited Model:</b> {display_engine}</font></para>", subtitle_style)
         ]
     ]
-    t_header = Table(header_data, colWidths=[340, 200])
+    t_header = Table(header_data, colWidths=[330, 210])
     t_header.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
@@ -164,14 +215,6 @@ def build_evaluation_pdf(record: dict) -> bytes:
     story.append(t_header)
     story.append(Spacer(1, 8))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#4f46e5'), spaceAfter=10))
-
-    # Parse JSON detail fields safely
-    rel_details = safe_parse(record.get('relevance_details'))
-    acc_details = safe_parse(record.get('accuracy_details'))
-    hal_details = safe_parse(record.get('hallucination_details'))
-    comp_details = safe_parse(record.get('completeness_details'))
-    verd_details = safe_parse(record.get('verdict_details'))
-    evidence_list = safe_parse(record.get('retrieved_evidence'), [])
 
     verdict_raw = record.get('final_verdict') or verdDetails_status if (verdDetails_status := verd_details.get('status')) else 'EVALUATED'
     verdict_str = verdict_raw.upper()
@@ -481,7 +524,7 @@ def build_evaluation_pdf(record: dict) -> bytes:
     ]))
     story.append(t_foot)
 
-    doc.build(story)
+    doc.build(story, canvasmaker=NumberedCanvas)
     return buffer.getvalue()
 
 
@@ -645,9 +688,12 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
     else:
         date_str = str(created_at)
 
-    story.append(Paragraph("Batch Multi-Agent Evaluation Report", title_style))
+    batch_eng_raw = batch_info.get("ai_engine") or (records[0].get("ai_engine") if records else "openai")
+    batch_engine_display = "Google Gemini 1.5" if "gemini" in str(batch_eng_raw).lower() else "OpenAI GPT-4o-mini"
+
+    story.append(Paragraph("<b>SENTRYAI • BATCH EVALUATION AUDIT REPORT</b>", title_style))
     story.append(Paragraph(
-        f"<b>Batch ID:</b> {batch_id} &nbsp;|&nbsp; <b>File:</b> {filename} &nbsp;|&nbsp; <b>Evaluated At:</b> {date_str}",
+        f"<b>Batch ID:</b> {batch_id} &nbsp;|&nbsp; <b>Dataset:</b> {filename} &nbsp;|&nbsp; <b>Model Engine:</b> {batch_engine_display} &nbsp;|&nbsp; <b>Audited:</b> {date_str}",
         subtitle_style,
     ))
     story.append(Spacer(1, 8))
@@ -1021,6 +1067,6 @@ def build_batch_evaluation_pdf(batch_info: dict, records: list) -> bytes:
     ]))
     story.append(t_foot)
 
-    doc.build(story)
+    doc.build(story, canvasmaker=NumberedCanvas)
     return buffer.getvalue()
 
