@@ -122,12 +122,22 @@ cd infosysVirtual_batch3
    cp .env.example .env
    ```
 
-5. Open `.env` and paste your API keys:
+5. Open `.env` and configure your API keys and Neon DB connection:
    ```env
+   # 🐘 Neon DB (Serverless PostgreSQL) - Recommended
+   # Get a free database at https://neon.tech
+   DATABASE_URL=postgresql://neondb_owner:your_password@ep-your-subdomain-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+   # 🚀 Cloud Retrieval Mode (Uses Neon DB GIN index, 0 MB local RAM)
+   USE_DB_RETRIEVAL=true
+
+   # 🤖 OpenAI API Key (Primary Multi-Agent Evaluation Engine)
    OPEN_AI_API_KEY=sk-proj-your-openai-key-here
+
+   # ♊ Google Gemini API Key (Secondary Multi-Agent Evaluation Engine)
    GEMINI_API_KEY=your-gemini-key-here
    ```
-   > 💡 **No PostgreSQL? No problem!** If `DATABASE_URL` is omitted, SentryAI will automatically initialize and use a local SQLite database (`evaluations_fallback.db`). Zero external setup required!
+   > 💡 **Zero-Friction Fallback:** If you don't have a Neon DB account yet, simply leave `DATABASE_URL` empty or commented out. SentryAI will automatically initialize and run on an embedded local SQLite database (`evaluations_fallback.db`) with zero manual setup!
 
 6. Start the backend server:
    ```bash
@@ -166,21 +176,74 @@ cd infosysVirtual_batch3
 
 ### Backend (`backend/.env`)
 
-| Variable | Required? | Description | Example |
-| :--- | :---: | :--- | :--- |
-| `OPEN_AI_API_KEY` | Recommended | OpenAI API key for `gpt-4o-mini` primary evaluation engine. | `sk-proj-abc123...` |
-| `GEMINI_API_KEY` | Recommended | Google Gemini API key for `gemini-1.5-flash` engine. | `AIzaSyD...` |
-| `GEMINI_API_KEY_2` | Optional | Secondary backup Gemini key for automatic rate-limit rotation. | `AIzaSyB...` |
-| `GEMINI_API_KEY_3` | Optional | Tertiary backup Gemini key. | `AIzaSyC...` |
-| `DATABASE_URL` | Optional | PostgreSQL connection string (NeonDB or local). Falls back to SQLite if omitted. | `postgresql://user:pass@host/db?sslmode=require` |
-| `USE_DB_RETRIEVAL`| Optional | Set `true` in cloud/low-RAM (Render) to query DB GIN index (0 MB RAM). Set `false` for local FAISS. | `true` |
-| `PORT` | Optional | Server port (defaults to 8000). | `8000` |
+SentryAI reads configuration from `backend/.env`. A complete template is provided in `backend/.env.example`:
+
+```env
+# ==============================================================================
+# SentryAI Backend Configuration (.env)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 🐘 1. Neon DB (Serverless PostgreSQL Database)
+# ------------------------------------------------------------------------------
+# Neon DB powers all persistent storage in SentryAI, including 2,766 verified
+# benchmark knowledge chunks (TruthfulQA + SQuAD 2.0), evaluation audit logs,
+# and asynchronous batch jobs.
+#
+# Free Setup:
+# 1. Sign up at: https://neon.tech (free tier includes 500 MB storage & pooling)
+# 2. Create a project and select your preferred AWS region
+# 3. Copy the connection string from the Dashboard (use the Pooled URL)
+# 4. Paste below (make sure ?sslmode=require is present):
+DATABASE_URL=postgresql://neondb_owner:your_password@ep-your-subdomain-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+# ------------------------------------------------------------------------------
+# 🚀 2. Retrieval Mode (Neon DB GIN Search vs Local FAISS)
+# ------------------------------------------------------------------------------
+# - 'true'  : Queries Neon DB directly using PostgreSQL GIN search vectors and
+#             ts_rank_cd. Consumes 0 MB local RAM (vital for Render free tier).
+# - 'false' : Uses local FAISS vector index with sentence-transformers
+#             (requires PyTorch and ~400 MB of local RAM).
+USE_DB_RETRIEVAL=true
+
+# ------------------------------------------------------------------------------
+# 🤖 3. OpenAI API Key (Primary Evaluation Engine)
+# ------------------------------------------------------------------------------
+# Powers GPT-4o-mini for high-precision multi-agent reasoning.
+# Get your API key: https://platform.openai.com/api-keys
+OPEN_AI_API_KEY=sk-proj-your-openai-api-key-here
+
+# ------------------------------------------------------------------------------
+# ♊ 4. Google Gemini API Key (Secondary Evaluation Engine)
+# ------------------------------------------------------------------------------
+# Powers Gemini 1.5 Flash. Supports automatic key rotation when rate limits occur.
+# Get your free key: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=your-primary-gemini-api-key
+GEMINI_API_KEY_2=your-second-gemini-api-key   # Optional: backup key for rotation
+GEMINI_API_KEY_3=your-third-gemini-api-key    # Optional: backup key for rotation
+
+# ------------------------------------------------------------------------------
+# 🌐 5. Server Port
+# ------------------------------------------------------------------------------
+PORT=8000
+```
+
+### Detailed Backend Variables Breakdown
+
+| Variable | Service | Required? | Description |
+| :--- | :---: | :---: | :--- |
+| `DATABASE_URL` | **Neon DB** | Recommended | PostgreSQL connection string from [neon.tech](https://neon.tech). Includes connection pooling (`-pooler`) and SSL (`?sslmode=require`). Automatically initializes all relational schemas and indexes. |
+| `USE_DB_RETRIEVAL` | **Neon DB** | Recommended | Set to `true` to execute hybrid RAG search over Neon DB's GIN full-text index with 0 MB local memory footprint. Set to `false` for local FAISS. |
+| `OPEN_AI_API_KEY` | **OpenAI** | Recommended | API key powering the primary GPT-4o-mini multi-agent evaluation engine. |
+| `GEMINI_API_KEY` | **Google Gemini** | Recommended | API key powering the secondary Gemini 1.5 Flash engine. |
+| `GEMINI_API_KEY_2/3`| **Google Gemini** | Optional | Fallback Gemini API keys for seamless quota rotation during high-volume batch evaluations. |
+| `PORT` | **Uvicorn** | Optional | Backend HTTP listener port (default: `8000`). |
 
 ### Frontend (`frontend/.env`)
 
 | Variable | Required? | Description | Default |
 | :--- | :---: | :--- | :--- |
-| `VITE_API_BASE_URL` | Optional | Target backend URL. Set this to your deployed Render URL for production. | `http://127.0.0.1:8000` |
+| `VITE_API_BASE_URL` | Optional | Target backend URL. In local dev, leave as default. In production (Vercel), set to your deployed Render URL. | `http://127.0.0.1:8000` |
 
 ---
 
