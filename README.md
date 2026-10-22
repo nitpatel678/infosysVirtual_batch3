@@ -6,6 +6,7 @@
   <img src="https://img.shields.io/badge/Database-PostgreSQL%20%7C%20NeonDB-00e599?style=for-the-badge&logo=postgresql" alt="NeonDB" />
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=for-the-badge&logo=python" alt="Python" />
   <img src="https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite-61dafb?style=for-the-badge&logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="MIT License" />
 </p>
 
 <p align="center">
@@ -388,7 +389,8 @@ Contributions, bug reports, and feature requests are welcome!
 
 ## 📄 License & Credits
 
-- **Developer:** Nitin Patel
+- **License:** Distributed under the **MIT License**. See the [`LICENSE`](./LICENSE) file for full details and permissions.
+- **Developer & Maintainer:** Nitin Patel (2026)
 - **Origin:** Conceptualized and developed as part of the **Infosys Springboard Virtual Internship (Batch 3)** under the AI & Intelligent Automation track.
 - **Reference Datasets:** TruthfulQA (Lin et al., 2022) & SQuAD 2.0 (Rajpurkar et al., 2018).
 - **Core Open Source Libraries:** FastAPI, React, Vite, ReportLab, NeonDB, and PyMuPDF.
